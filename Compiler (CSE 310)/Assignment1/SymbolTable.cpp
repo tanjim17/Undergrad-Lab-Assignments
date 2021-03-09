@@ -1,13 +1,20 @@
 #include <bits/stdc++.h>
 using namespace std;
 
-int NUM_OF_BUCKETS;
-
 int hash_(string key, int numOfBuckets) {
     int sumOfAsciiValues = 0;
     for (int i = 0; i<key.size(); i++)
         sumOfAsciiValues += key[i];
     return sumOfAsciiValues % numOfBuckets;
+}
+
+vector<string> stringSplit(string str) {
+    istringstream ss(str);
+    vector<string> tokenList;
+    string token;
+    while (ss >> token)
+        tokenList.push_back(token);
+    return tokenList;
 }
 
 class SymbolInfo {
@@ -33,42 +40,60 @@ class ScopeTable {
     int numOfBuckets;
     SymbolInfo** buckets;
     ScopeTable* parent;
-    int level;
     string id;
+    int lastChildId; // for tracking scope table id
 
 public:
-    ScopeTable(int numOfBuckets, ScopeTable* parent, int level, int id) {
+    ScopeTable(int numOfBuckets, ScopeTable* parent, int id) {
         this->numOfBuckets = numOfBuckets;
         buckets = new SymbolInfo*[numOfBuckets];
         for(int i=0; i<numOfBuckets; i++)
             buckets[i] = NULL;
         this->parent = parent;
-        this->level = level;
         if(parent != NULL)
             this->id = parent->getId() + "." + to_string(id);
         else
             this->id = to_string(id);
+        lastChildId = 0;
     }
 
     bool insert(string name, string type) {
         int bucketNo = hash_(name, numOfBuckets);
         SymbolInfo* current = buckets[bucketNo];
-        while(current != NULL) {
-            if(current->getName() == name)
-                return false;
-            current = current->getNext();
+        if(current == NULL) {
+            buckets[bucketNo] = new SymbolInfo(name, type);
+            cout << "Inserted in ScopeTable # " + id + " at position " << bucketNo << ", 0" << endl;
+            return true;
         }
-        current = new SymbolInfo(name, type);
+        if(current->getName() == name) {
+            cout << "<" + name + ", " + type + "> already exists in current ScopeTable\n";
+            return false;
+        }
+        int index = 1;
+        while(current->getNext() != NULL) {
+            if(current->getName() == name) {
+                cout << "<" + name + ", " + type + "> already exists in ScopeTable\n";
+                return false;
+            }
+            current = current->getNext();
+            index ++;
+        }
+        current->setNext(new SymbolInfo(name, type));
+        cout << "Inserted in ScopeTable # " + id + " at position " << bucketNo << ", " << index << endl;
         return true;
     }
 
     SymbolInfo* lookUp(string name) {
         int bucketNo = hash_(name, numOfBuckets);
         SymbolInfo* current = buckets[bucketNo];
+        int index = 0;
         while(current != NULL) {
-            if(current->getName() == name)
+            if(current->getName() == name) {
+                cout << "Found in ScopeTable # " + id + " at position " << bucketNo << ", " << index << endl;
                 return current;
+            }
             current = current->getNext();
+            index = 0;
         }
         return NULL;
     }
@@ -76,19 +101,26 @@ public:
     bool delete_(string name) {
         int bucketNo = hash_(name, numOfBuckets);
         SymbolInfo* current = buckets[bucketNo];
-        if(current == NULL)
+        if(current == NULL) {
+            cout << "Not Found\n";
             return false;
+        }
         if(current->getName() == name) {
+            cout << "Deleted entry " << bucketNo << ", 0 from current ScopeTable\n";
             buckets[bucketNo] = current->getNext();
             return true;
         }
+        int index = 1;
         while(current->getNext() != NULL) {
             if(current->getNext()->getName() == name) {
+                cout << "Deleted entry " << bucketNo << ", " << index << " from current ScopeTable\n";
                 current->setNext(current->getNext()->getNext());
                 return true;
             }
             current = current->getNext();
+            index ++;
         }
+        cout << "Not Found" << endl;
         return false;
     }
 
@@ -106,8 +138,11 @@ public:
         cout << endl;
     }
 
+    int increaseAndGetLastChildId() {
+        return ++ lastChildId;
+    }
+
     ScopeTable* getParent() {return parent;}
-    int getLevel() {return level;}
     string getId() {return id;}
 
     ~ScopeTable() {
@@ -116,26 +151,23 @@ public:
 };
 
 class SymbolTable {
+    int numOfBuckets;
     ScopeTable* currentScopeTable;
-    vector<int> idCounts; // to track scope table ids of levels
 public:
-    SymbolTable() {
-        idCounts = {1}; //level 1 corresponds to index 0
-        currentScopeTable = new ScopeTable(NUM_OF_BUCKETS, NULL, 1, 1);
+    SymbolTable(int numOfBuckets) {
+        this->numOfBuckets = numOfBuckets;
+        currentScopeTable = new ScopeTable(numOfBuckets, NULL, 1);
     }
 
     void enterScope() {
-        int newLevel = currentScopeTable->getLevel() + 1;
-        if(newLevel > idCounts.size())
-            idCounts.push_back(1);
-        else
-            idCounts[newLevel - 1] ++;
-        ScopeTable* newScopeTable = new ScopeTable(NUM_OF_BUCKETS, currentScopeTable, newLevel, idCounts[newLevel - 1]);
+        ScopeTable* newScopeTable = new ScopeTable(numOfBuckets, currentScopeTable, currentScopeTable->increaseAndGetLastChildId());
+        cout << "New ScopeTable with id " + newScopeTable->getId() + " created\n";
         currentScopeTable = newScopeTable;
     }
 
     void exitScope() {
         ScopeTable* temp = currentScopeTable->getParent();
+        cout << "ScopeTable with id " << currentScopeTable->getId() << " removed\n";
         delete currentScopeTable;
         currentScopeTable = temp;
     }
@@ -156,6 +188,7 @@ public:
                 return symbolInfo;
             current = current->getParent();
         }
+        cout << "Not found\n";
         return NULL;
     }
 
@@ -167,10 +200,63 @@ public:
         ScopeTable* current = currentScopeTable;
         while(current != NULL) {
             current->print();
+            current = current->getParent();
         }
     }
 };
 
 int main() {
+    ifstream fin("input.txt");
+    int numOfBuckets;
+    fin >> numOfBuckets;
+
+    SymbolTable symbolTable(numOfBuckets);
+
+    string line;
+    vector<string> tokenList;
+    string command;
+    while (getline(fin, line)) {
+        tokenList = stringSplit(line);
+        if(tokenList.size() > 0) {
+            command = tokenList[0];
+            if(command == "I") {
+                if(tokenList.size() == 3)
+                    symbolTable.insert(tokenList[1], tokenList[2]);
+                else
+                    cout << "wrong command\n";
+            }
+            else if(command == "L") {
+                if(tokenList.size() == 2)
+                    symbolTable.lookUp(tokenList[1]);
+                else
+                    cout << "wrong command\n";
+            }
+            else if(command == "D") {
+                if(tokenList.size() == 2)
+                    symbolTable.delete_(tokenList[1]);
+                else
+                    cout << "wrong command\n";
+            }
+            else if(command == "P") {
+                if(tokenList.size() == 2) {
+                    if(tokenList[1] == "A") symbolTable.printAllScopeTables();
+                    else if(tokenList[1] == "C") symbolTable.printCurrentScopeTable();
+                    else cout << "wrong command\n";
+                }
+                else
+                    cout << "wrong command\n";
+            }
+            else if(command == "S") {
+                symbolTable.enterScope();
+            }
+            else if(command == "E") {
+                symbolTable.exitScope();
+            }
+            else {
+                cout << "wrong command\n";
+            }
+        }
+    }
+
     return 0;
 }
