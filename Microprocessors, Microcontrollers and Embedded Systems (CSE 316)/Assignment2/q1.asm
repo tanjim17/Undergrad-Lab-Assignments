@@ -6,11 +6,11 @@
     CR EQU 0DH
     LF EQU 0AH
     
-    MSG1 DB 'Enter X (any number between 0-9): $'
-    MSG2 DB CR, LF, 'Enter Y (any number between 0-9): $'
-    MSG3 DB CR, LF, 'Enter Z (any number between 0-9): $'
-    MSG4 DB CR, LF, 'All the numbers are equal$'
-    MSG5 DB CR, LF, '2nd highest number is: $'
+    INPUT_X_MSG DB 'Enter X (any number between 0-9): $'
+    INPUT_Y_MSG DB CR, LF, 'Enter Y (any number between 0-9): $'
+    INPUT_Z_MSG DB CR, LF, 'Enter Z (any number between 0-9): $'
+    ALL_EQUAL_MSG DB CR, LF, 'All the numbers are equal$'
+    SECOND_HIGHEST_MSG DB CR, LF, '2nd highest number is: $'
     X DB ?
     Y DB ?
     Z DB ?
@@ -23,7 +23,7 @@ MAIN PROC
     MOV DS, AX
     
 ;input X
-    LEA DX, MSG1
+    LEA DX, INPUT_X_MSG
     MOV AH, 9
     INT 21H     
     MOV AH, 1
@@ -31,7 +31,7 @@ MAIN PROC
     MOV X, AL      
 
 ;input Y
-    LEA DX, MSG2
+    LEA DX, INPUT_Y_MSG
     MOV AH, 9
     INT 21H     
     MOV AH, 1
@@ -39,7 +39,7 @@ MAIN PROC
     MOV Y, AL
     
 ;input Z
-    LEA DX, MSG3
+    LEA DX, INPUT_Z_MSG
     MOV AH, 9
     INT 21H     
     MOV AH, 1
@@ -81,27 +81,29 @@ END_IF3:
         CMP Z, AL
         JNE ELSE2
     ;then    
-        LEA DX, MSG4
+        LEA DX, ALL_EQUAL_MSG
         MOV AH, 9
         INT 21H
-        JMP DOS_EXIT
+        JMP END_IF5
     ELSE2:
-        LEA DX, MSG5
+        LEA DX, SECOND_HIGHEST_MSG
         MOV AH, 9
         INT 21H
         MOV AH, 2
         MOV DL, Z
         INT 21H
-        JMP DOS_EXIT
+    END_IF5:
+        JMP END_IF4
 ELSE1:
-    LEA DX, MSG5
+    LEA DX, SECOND_HIGHEST_MSG
     MOV AH, 9
     INT 21H
     MOV AH, 2
     MOV DL, Y
     INT 21H
+END_IF4:
     
-DOS_EXIT:
+;return to DOS
     MOV AH, 4CH
     INT 21H
   
