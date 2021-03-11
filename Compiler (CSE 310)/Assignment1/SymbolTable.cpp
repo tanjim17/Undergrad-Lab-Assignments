@@ -66,13 +66,13 @@ public:
             return true;
         }
         if(current->getName() == name) {
-            cout << "<" + name + ", " + type + "> already exists in current ScopeTable\n";
+            cout << "<" + name + ", " + current->getType() + "> already exists in current ScopeTable\n";
             return false;
         }
         int index = 1;
         while(current->getNext() != NULL) {
-            if(current->getName() == name) {
-                cout << "<" + name + ", " + type + "> already exists in ScopeTable\n";
+            if(current->getNext()->getName() == name) {
+                cout << "<" + name + ", " + current->getNext()->getType() + "> already exists in ScopeTable\n";
                 return false;
             }
             current = current->getNext();
@@ -93,7 +93,7 @@ public:
                 return current;
             }
             current = current->getNext();
-            index = 0;
+            index ++;
         }
         return NULL;
     }
@@ -108,13 +108,16 @@ public:
         if(current->getName() == name) {
             cout << "Deleted entry " << bucketNo << ", 0 from current ScopeTable\n";
             buckets[bucketNo] = current->getNext();
+            delete current;
             return true;
         }
         int index = 1;
         while(current->getNext() != NULL) {
             if(current->getNext()->getName() == name) {
                 cout << "Deleted entry " << bucketNo << ", " << index << " from current ScopeTable\n";
-                current->setNext(current->getNext()->getNext());
+                SymbolInfo* temp = current->getNext();
+                current->setNext(temp->getNext());
+                delete temp;
                 return true;
             }
             current = current->getNext();
@@ -130,7 +133,7 @@ public:
             cout << i << " --> ";
             SymbolInfo* current = buckets[i];
             while(current != NULL) {
-                cout << "<" << current->getName() << ", " << current->getType() << "> ";
+                cout << "<" << current->getName() << " : " << current->getType() << "> ";
                 current = current->getNext();
             }
             cout << endl;
@@ -146,6 +149,14 @@ public:
     string getId() {return id;}
 
     ~ScopeTable() {
+        for(int i=0; i<numOfBuckets; i++) {
+            SymbolInfo* current = buckets[i];
+            while(current != NULL) {
+                SymbolInfo* temp = current->getNext();
+                delete current;
+                current = temp;
+            }
+        }
         delete[] buckets;
     }
 };
@@ -201,6 +212,14 @@ public:
         while(current != NULL) {
             current->print();
             current = current->getParent();
+        }
+    }
+
+    ~SymbolTable() {
+        while(currentScopeTable != NULL) {
+            ScopeTable* temp = currentScopeTable->getParent();
+            delete currentScopeTable;
+            currentScopeTable = temp;
         }
     }
 };
