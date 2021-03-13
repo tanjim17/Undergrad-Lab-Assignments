@@ -1,6 +1,9 @@
 #include <bits/stdc++.h>
 using namespace std;
 
+ifstream fin;
+ofstream fout;
+
 int hash_(string key, int numOfBuckets) {
     int sumOfAsciiValues = 0;
     for (int i = 0; i<key.size(); i++)
@@ -63,16 +66,19 @@ public:
         if(current == NULL) {
             buckets[bucketNo] = new SymbolInfo(name, type);
             cout << "Inserted in ScopeTable # " + id + " at position " << bucketNo << ", 0" << endl;
+            fout << "Inserted in ScopeTable # " + id + " at position " << bucketNo << ", 0" << endl;
             return true;
         }
         if(current->getName() == name) {
             cout << "<" + name + ", " + current->getType() + "> already exists in current ScopeTable\n";
+            fout << "<" + name + ", " + current->getType() + "> already exists in current ScopeTable\n";
             return false;
         }
         int index = 1;
         while(current->getNext() != NULL) {
             if(current->getNext()->getName() == name) {
                 cout << "<" + name + ", " + current->getNext()->getType() + "> already exists in ScopeTable\n";
+                fout << "<" + name + ", " + current->getNext()->getType() + "> already exists in ScopeTable\n";
                 return false;
             }
             current = current->getNext();
@@ -80,6 +86,7 @@ public:
         }
         current->setNext(new SymbolInfo(name, type));
         cout << "Inserted in ScopeTable # " + id + " at position " << bucketNo << ", " << index << endl;
+        fout << "Inserted in ScopeTable # " + id + " at position " << bucketNo << ", " << index << endl;
         return true;
     }
 
@@ -90,6 +97,7 @@ public:
         while(current != NULL) {
             if(current->getName() == name) {
                 cout << "Found in ScopeTable # " + id + " at position " << bucketNo << ", " << index << endl;
+                fout << "Found in ScopeTable # " + id + " at position " << bucketNo << ", " << index << endl;
                 return current;
             }
             current = current->getNext();
@@ -103,10 +111,12 @@ public:
         SymbolInfo* current = buckets[bucketNo];
         if(current == NULL) {
             cout << "Not Found\n";
+            fout << "Not Found\n";
             return false;
         }
         if(current->getName() == name) {
             cout << "Deleted entry " << bucketNo << ", 0 from current ScopeTable\n";
+            fout << "Deleted entry " << bucketNo << ", 0 from current ScopeTable\n";
             buckets[bucketNo] = current->getNext();
             delete current;
             return true;
@@ -115,6 +125,7 @@ public:
         while(current->getNext() != NULL) {
             if(current->getNext()->getName() == name) {
                 cout << "Deleted entry " << bucketNo << ", " << index << " from current ScopeTable\n";
+                fout << "Deleted entry " << bucketNo << ", " << index << " from current ScopeTable\n";
                 SymbolInfo* temp = current->getNext();
                 current->setNext(temp->getNext());
                 delete temp;
@@ -124,21 +135,27 @@ public:
             index ++;
         }
         cout << "Not Found" << endl;
+        fout << "Not Found" << endl;
         return false;
     }
 
     void print() {
         cout << "ScopeTable # " + id << endl;
+        fout << "ScopeTable # " + id << endl;
         for(int i=0; i<numOfBuckets; i++) {
             cout << i << " --> ";
+            fout << i << " --> ";
             SymbolInfo* current = buckets[i];
             while(current != NULL) {
                 cout << "<" << current->getName() << " : " << current->getType() << "> ";
+                fout << "<" << current->getName() << " : " << current->getType() << "> ";
                 current = current->getNext();
             }
             cout << endl;
+            fout << endl;
         }
         cout << endl;
+        fout << endl;
     }
 
     int increaseAndGetLastChildId() {
@@ -173,12 +190,14 @@ public:
     void enterScope() {
         ScopeTable* newScopeTable = new ScopeTable(numOfBuckets, currentScopeTable, currentScopeTable->increaseAndGetLastChildId());
         cout << "New ScopeTable with id " + newScopeTable->getId() + " created\n";
+        fout << "New ScopeTable with id " + newScopeTable->getId() + " created\n";
         currentScopeTable = newScopeTable;
     }
 
     void exitScope() {
         ScopeTable* temp = currentScopeTable->getParent();
         cout << "ScopeTable with id " << currentScopeTable->getId() << " removed\n";
+        fout << "ScopeTable with id " << currentScopeTable->getId() << " removed\n";
         delete currentScopeTable;
         currentScopeTable = temp;
     }
@@ -200,6 +219,7 @@ public:
             current = current->getParent();
         }
         cout << "Not found\n";
+        fout << "Not found\n";
         return NULL;
     }
 
@@ -225,7 +245,8 @@ public:
 };
 
 int main() {
-    ifstream fin("input.txt");
+    fin.open("input.txt");
+    fout.open("output.txt");
     int numOfBuckets;
     fin >> numOfBuckets;
 
@@ -235,35 +256,48 @@ int main() {
     vector<string> tokenList;
     string command;
     while (getline(fin, line)) {
+        cout << line << endl;
+        fout << line << endl;
         tokenList = stringSplit(line);
         if(tokenList.size() > 0) {
             command = tokenList[0];
             if(command == "I") {
                 if(tokenList.size() == 3)
                     symbolTable.insert(tokenList[1], tokenList[2]);
-                else
+                else {
                     cout << "wrong command\n";
+                    fout << "wrong command\n";
+                }
             }
             else if(command == "L") {
                 if(tokenList.size() == 2)
                     symbolTable.lookUp(tokenList[1]);
-                else
+                else {
                     cout << "wrong command\n";
+                    fout << "wrong command\n";
+                }
             }
             else if(command == "D") {
                 if(tokenList.size() == 2)
                     symbolTable.delete_(tokenList[1]);
-                else
+                else {
                     cout << "wrong command\n";
+                    fout << "wrong command\n";
+                }
             }
             else if(command == "P") {
                 if(tokenList.size() == 2) {
                     if(tokenList[1] == "A") symbolTable.printAllScopeTables();
                     else if(tokenList[1] == "C") symbolTable.printCurrentScopeTable();
-                    else cout << "wrong command\n";
+                    else {
+                        cout << "wrong command\n";
+                        fout << "wrong command\n";
+                    }
                 }
-                else
+                else {
                     cout << "wrong command\n";
+                    fout << "wrong command\n";
+                }
             }
             else if(command == "S") {
                 symbolTable.enterScope();
@@ -273,9 +307,11 @@ int main() {
             }
             else {
                 cout << "wrong command\n";
+                fout << "wrong command\n";
             }
         }
     }
-
+    fin.close();
+    fout.close();
     return 0;
 }
