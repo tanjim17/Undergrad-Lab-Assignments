@@ -6,10 +6,10 @@ interface SystemBuilder {
     void buildController();
     void buildDisplay();
     void buildIdentification();
-    void buildInternetConnection();
+    void buildInternetConnection(String internetConnectionName);
     void buildMicrocontroller();
     void buildStorage();
-    void buildWebServer();
+    void buildWebServer(String frameworkName);
     void buildWeightMeasurement();
 
     System_ getSystem();

@@ -1,5 +1,7 @@
 package builder;
 
+import system.component.controller.Button;
+import system.component.display.LCDDisplay;
 import system.component.identification.RFID;
 import system.component.microcontroller.ATMega32;
 import system.SilverSystem;
@@ -8,7 +10,7 @@ import system.component.storage.SDCard;
 import system.component.weightmeasurement.LoadSensor;
 
 class SilverBuilder implements SystemBuilder{
-    SilverSystem silverSystem;
+    private SilverSystem silverSystem;
 
     SilverBuilder() {
         silverSystem = new SilverSystem();
@@ -35,22 +37,23 @@ class SilverBuilder implements SystemBuilder{
     }
 
     @Override
-    public void buildWebServer() {
+    public void buildWebServer(String frameworkName) {
+
     }
 
     @Override
     public void buildDisplay() {
-
+        silverSystem.setDisplay(new LCDDisplay());
     }
 
     @Override
-    public void buildInternetConnection() {
+    public void buildInternetConnection(String internetConnectionName) {
 
     }
 
     @Override
     public void buildController() {
-
+        silverSystem.setController(new Button());
     }
 
     @Override

@@ -1,34 +1,56 @@
-import builder.SystemBuilder;
 import builder.SystemDirector;
 import system.System_;
 
+import java.util.InputMismatchException;
 import java.util.Scanner;
 
 public class Client {
-    public static void main(String [] args) {
+    private static String[] packages = {"package", "Silver", "Gold", "Diamond", "Platinum"};
+    private static String[] internetConnections = {"internet connection", "Wifi", "Ethernet", "SimCard"};
+    private static String[] frameworks = {"framework", "Django", "Spring", "Laravel"};
+
+    public static void main(String[] args) {
         SystemDirector systemDirector = new SystemDirector();
-        SystemBuilder systemBuilder;
         String packageName;
         String internetConnectionName;
         String frameworkName;
         Scanner sc = new Scanner(System.in);
+        String command;
         while (true) {
-            System.out.println("Choose package: SilverBuilder, Gold, Diamond, Platinum\n" +
-                    "Choose internet connection: Wifi, Ethernet, SimCard\n" +
-                    "Choose framework: Django, Spring, Laravel");
-            String[] input = sc.nextLine().split(" ");
-            if(input[0].equalsIgnoreCase("exit")) {
+            System.out.println("Press 0 to exit, any other key to continue:");
+            command = sc.next();
+            if (command.equals("0"))
                 break;
-            }
-            if(input.length != 3) {
-                continue;
-            } else {
-                packageName = input[0];
-                internetConnectionName = input[1];
-                frameworkName = input[2];
-            }
+
+            packageName = chooseItem(packages);
+            internetConnectionName = chooseItem(internetConnections);
+            frameworkName = chooseItem(frameworks);
 
             System_ system = systemDirector.construct(packageName, internetConnectionName, frameworkName);
+        }
+    }
+
+    private static String chooseItem(String[] items) {
+        int chosenItemNo;
+        Scanner sc = new Scanner(System.in);
+        System.out.println("Choose " + items[0]);
+        for (int i = 1; i < items.length; i++) {
+            System.out.println(i + ". " + items[i]);
+        }
+        while (true) {
+            try {
+                chosenItemNo = sc.nextInt();
+            } catch (InputMismatchException e) {
+                System.out.println("invalid input!");
+                sc.nextLine();
+                continue;
+            }
+
+            if (chosenItemNo < items.length) {
+                return items[chosenItemNo];
+            } else {
+                System.out.println("invalid input!");
+            }
         }
     }
 }

@@ -1,5 +1,7 @@
 package builder;
 
+import system.System_;
+
 public class DiamondBuilder implements SystemBuilder{
     @Override
     public void buildMicrocontroller() {
@@ -12,7 +14,17 @@ public class DiamondBuilder implements SystemBuilder{
     }
 
     @Override
+    public System_ getSystem() {
+        return null;
+    }
+
+    @Override
     public void buildIdentification() {
+
+    }
+
+    @Override
+    public void buildInternetConnection(String internetConnectionName) {
 
     }
 
@@ -22,17 +34,12 @@ public class DiamondBuilder implements SystemBuilder{
     }
 
     @Override
-    public void buildWebServer() {
+    public void buildWebServer(String frameworkName) {
 
     }
 
     @Override
     public void buildDisplay() {
-
-    }
-
-    @Override
-    public void buildInternetConnection() {
 
     }
 

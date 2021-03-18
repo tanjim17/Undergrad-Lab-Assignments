@@ -1,8 +1,6 @@
 package builder;
 
-import builder.*;
-
-public class SystemBuilderFactory {
+class SystemBuilderFactory {
     static SystemBuilder createSystemBuilder(String packageName) {
         SystemBuilder systemBuilder = null;
 

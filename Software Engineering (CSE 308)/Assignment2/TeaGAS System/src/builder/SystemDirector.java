@@ -6,7 +6,6 @@ public class SystemDirector {
 
     public System_ construct(String packageName, String internetConnectionName, String frameworkName) {
         SystemBuilder systemBuilder = SystemBuilderFactory.createSystemBuilder(packageName);
-        if(systemBuilder == null) return null;
 
         systemBuilder.buildController();
         systemBuilder.buildDisplay();
