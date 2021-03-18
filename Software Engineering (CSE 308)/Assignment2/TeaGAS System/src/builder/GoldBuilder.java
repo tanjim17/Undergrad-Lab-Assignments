@@ -1,50 +1,44 @@
 package builder;
 
-import system.System_;
+import system.GoldSystem;
+import system.component.controller.Button;
+import system.component.display.LEDDisplay;
+import system.component.identification.RFID;
+import system.component.microcontroller.Arduino;
+import system.component.storage.SDCard;
+import system.component.weightmeasurement.WeightModule;
 
-public class GoldBuilder implements SystemBuilder{
+class GoldBuilder extends SystemBuilder{
+    GoldBuilder() {
+        system = new GoldSystem();
+    }
     @Override
-    public void buildMicrocontroller() {
-
+    void buildMicroController() {
+        system.setMicrocontroller(new Arduino());
     }
 
     @Override
-    public void buildWeightMeasurement() {
-
+    void buildWeightMeasurement() {
+        system.setWeightMeasurement(new WeightModule());
     }
 
     @Override
-    public System_ getSystem() {
-        return null;
+    void buildIdentification() {
+        system.setIdentification(new RFID());
     }
 
     @Override
-    public void buildIdentification() {
-
+    void buildStorage() {
+        system.setStorage(new SDCard());
     }
 
     @Override
-    public void buildInternetConnection(String internetConnectionName) {
-
+    void buildDisplay() {
+        system.setDisplay(new LEDDisplay());
     }
 
     @Override
-    public void buildStorage() {
-
-    }
-
-    @Override
-    public void buildWebServer(String frameworkName) {
-
-    }
-
-    @Override
-    public void buildDisplay() {
-
-    }
-
-    @Override
-    public void buildController() {
-
+    void buildController() {
+        system.setController(new Button());
     }
 }

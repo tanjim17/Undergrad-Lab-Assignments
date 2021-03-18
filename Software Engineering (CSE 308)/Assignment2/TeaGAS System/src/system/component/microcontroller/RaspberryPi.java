@@ -1,7 +1,9 @@
 package system.component.microcontroller;
 
-public class RaspberryPi implements Microcontroller{
+import system.component.storage.Storage;
+
+public class RaspberryPi implements MicroController, Storage {
     public RaspberryPi() {
-        System.out.println("RaspberryPi");
+        System.out.println("RaspberryPi (built-in storage)");
     }
 }

@@ -1,13 +1,12 @@
 import builder.SystemDirector;
 import system.System_;
 
-import java.util.InputMismatchException;
-import java.util.Scanner;
+import java.util.*;
 
 public class Client {
-    private static String[] packages = {"package", "Silver", "Gold", "Diamond", "Platinum"};
-    private static String[] internetConnections = {"internet connection", "Wifi", "Ethernet", "SimCard"};
-    private static String[] frameworks = {"framework", "Django", "Spring", "Laravel"};
+    private static final List<String> packages = new ArrayList<>(Arrays.asList("package", "Silver", "Gold", "Diamond", "Platinum"));
+    private static List<String> internetConnections = new ArrayList<>(Arrays.asList("internet connection", "Wifi", "GSM"));
+    private static final List<String>  frameworks = new ArrayList<>(Arrays.asList("framework", "Django", "Spring", "Laravel"));
 
     public static void main(String[] args) {
         SystemDirector systemDirector = new SystemDirector();
@@ -23,19 +22,21 @@ public class Client {
                 break;
 
             packageName = chooseItem(packages);
-            internetConnectionName = chooseItem(internetConnections);
+            internetConnectionName = chooseItem(getInternetConnections(packageName));
             frameworkName = chooseItem(frameworks);
 
             System_ system = systemDirector.construct(packageName, internetConnectionName, frameworkName);
+
+            system.measureWeight();
         }
     }
 
-    private static String chooseItem(String[] items) {
+    private static String chooseItem(List<String> items) {
         int chosenItemNo;
         Scanner sc = new Scanner(System.in);
-        System.out.println("Choose " + items[0]);
-        for (int i = 1; i < items.length; i++) {
-            System.out.println(i + ". " + items[i]);
+        System.out.println("Choose " + items.get(0));
+        for (int i = 1; i < items.size(); i++) {
+            System.out.println(i + ". " + items.get(i));
         }
         while (true) {
             try {
@@ -46,11 +47,22 @@ public class Client {
                 continue;
             }
 
-            if (chosenItemNo < items.length) {
-                return items[chosenItemNo];
+            if (chosenItemNo < items.size()) {
+                return items.get(chosenItemNo);
             } else {
                 System.out.println("invalid input!");
             }
         }
+    }
+
+    private static List<String> getInternetConnections(String packageName) {
+        List<String> newInternetConnections = new ArrayList<>(internetConnections);
+        switch (packageName) {
+            case "Diamond":
+            case "Platinum":
+                newInternetConnections.add("Ethernet");
+                break;
+        }
+        return newInternetConnections;
     }
 }

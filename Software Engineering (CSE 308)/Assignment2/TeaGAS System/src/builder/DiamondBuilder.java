@@ -1,50 +1,15 @@
 package builder;
 
-import system.System_;
+import system.DiamondSystem;
+import system.component.weightmeasurement.LoadSensor;
 
-public class DiamondBuilder implements SystemBuilder{
-    @Override
-    public void buildMicrocontroller() {
-
+class DiamondBuilder extends RaspberrySystemBuilder{
+    DiamondBuilder() {
+        system = new DiamondSystem();
     }
 
     @Override
-    public void buildWeightMeasurement() {
-
-    }
-
-    @Override
-    public System_ getSystem() {
-        return null;
-    }
-
-    @Override
-    public void buildIdentification() {
-
-    }
-
-    @Override
-    public void buildInternetConnection(String internetConnectionName) {
-
-    }
-
-    @Override
-    public void buildStorage() {
-
-    }
-
-    @Override
-    public void buildWebServer(String frameworkName) {
-
-    }
-
-    @Override
-    public void buildDisplay() {
-
-    }
-
-    @Override
-    public void buildController() {
-
+    void buildWeightMeasurement() {
+        system.setWeightMeasurement(new LoadSensor());
     }
 }

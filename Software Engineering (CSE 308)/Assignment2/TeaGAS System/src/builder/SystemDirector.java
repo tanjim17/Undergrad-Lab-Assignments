@@ -11,7 +11,7 @@ public class SystemDirector {
         systemBuilder.buildDisplay();
         systemBuilder.buildIdentification();
         systemBuilder.buildInternetConnection(internetConnectionName);
-        systemBuilder.buildMicrocontroller();
+        systemBuilder.buildMicroController();
         systemBuilder.buildStorage();
         systemBuilder.buildWebServer(frameworkName);
         systemBuilder.buildWeightMeasurement();

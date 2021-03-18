@@ -1,4 +1,4 @@
 package system.component.microcontroller;
 
-public interface Microcontroller {
+public interface MicroController {
 }
