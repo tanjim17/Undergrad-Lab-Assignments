@@ -7,8 +7,8 @@
     LF EQU 0AH
     
     LINE_GAP DB CR, LF, '$'
-    INPUT_1_MSG DB 'Enter matrix 1 elements (2x2): $'
-    INPUT_2_MSG DB CR, LF, 'Enter matrix 2 elements (2x2): $'
+    INPUT_1_MSG DB 'Enter matrix 1 elements (2x2):', CR, LF, '$'
+    INPUT_2_MSG DB CR, LF, 'Enter matrix 2 elements (2x2):', CR, LF, '$'
     RESULT_MSG DB CR, LF, 'The result of the addition is:', CR, LF, '$'
     
     MATRIX_1 DB 4 DUP (?)
@@ -37,9 +37,11 @@ MAIN PROC
             SUB AL, 30H
             MOV MATRIX_1[BX][SI], AL
             INC SI
+            CALL PRINT_SPACE 
             LOOP COLUMN_LOOP
         ADD BX, 2
         POP CX
+        CALL PRINT_LINE_GAP
         LOOP ROW_LOOP   
     
     ;input matrix 2
@@ -58,9 +60,11 @@ MAIN PROC
             SUB AL, 30H
             MOV MATRIX_2[BX][SI], AL
             INC SI
+            CALL PRINT_SPACE
             LOOP COLUMN_LOOP1
         ADD BX, 2
         POP CX
+        CALL PRINT_LINE_GAP
         LOOP ROW_LOOP1
         
     ;addition
@@ -98,19 +102,28 @@ PRINT_NUMBER PROC
     PUSH CX
     
     ;push digits to stack
-    MOV DH, 0 ;for storing remainder in DX during while loop
-    MOV BL, 10
-    MOV CX, 0
-    WHILE1:
+    ;if number is zero
         CMP AL, 0
-        JE END_WHILE1
-        MOV AH, 0
-        DIV BL
-        MOV DL, AH
-        PUSH DX
-        INC CX
-        JMP WHILE1
-    END_WHILE1:
+        JNE ELSE1
+    ;then
+        PUSH 0
+        MOV CX, 1
+        JMP END_IF1
+    ELSE1:
+        MOV DH, 0 ;for storing remainder in DX during while loop     
+        MOV BL, 10
+        MOV CX, 0
+        WHILE1:
+            CMP AL, 0
+            JE END_WHILE1
+            MOV AH, 0
+            DIV BL
+            MOV DL, AH
+            PUSH DX
+            INC CX
+            JMP WHILE1
+        END_WHILE1:
+    END_IF1:
     
     MOV AH, 2  
     ;pop digits from stack and print
@@ -127,5 +140,23 @@ PRINT_NUMBER PROC
     POP BX
     RET
 PRINT_NUMBER ENDP
+
+PRINT_SPACE PROC
+    PUSH AX
+    MOV AH, 2
+    MOV DL, ' '
+    INT 21H
+    POP AX 
+    RET    
+PRINT_SPACE ENDP
+    
+PRINT_LINE_GAP PROC
+    PUSH AX
+    MOV AH, 9
+    LEA DX, LINE_GAP
+    INT 21H
+    POP AX 
+    RET    
+PRINT_LINE_GAP ENDP         
 
 END MAIN
