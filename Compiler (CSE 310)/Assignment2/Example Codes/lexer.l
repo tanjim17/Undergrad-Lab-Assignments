@@ -23,31 +23,33 @@ void printOperatorToken(string type) {
 	logout << "Line no " << line_count << " TOKEN <" + type + "> Lexeme " << yytext << " found\n";
 }
 
-char getEscapeSeqValue(char c) {
-	switch(c) {
-		case 'n':
-			return '\n'; break;
-		case 't':
-			return '\t'; break;
-		case '\\':
-			return '\\'; break;
-		case '\'':
-			return '\''; break;
-		case 'a':
-			return '\a'; break;
-		case 'f':
-			return '\f'; break;
-		case 'r':
-			return '\r'; break;
-		case 'b':
-			return '\b'; break;
-		case 'v':
-			return '\v'; break;
-		case '0':
-			return '\0'; break;
-		default:
-			cout << "\nerror\n"; return 'x';
-	}
+string replaceWithEscapeSeq(string s) {
+	for(int i=0; i<s.size(); i++) {
+        if(s[i] == '\\') {
+            s.erase(i, 1);
+            switch(s[i]) {
+				case 'n':
+					s[i] = '\n'; break;
+				case 't':
+					s[i] = '\t'; break;
+				case 'a':
+					s[i] = '\a'; break;
+				case 'f':
+					s[i] = '\f'; break;
+				case 'r':
+					s[i] = '\r'; break;
+				case 'b':
+					s[i] = '\b'; break;
+				case 'v':
+					s[i] = '\v'; break;
+				case '0':
+					s[i] = '\0'; break;
+				case '\n': //for multiline string
+					s.erase(i, 1); break;
+			}
+        }
+    }
+    return s;
 }
 
 %}
@@ -57,6 +59,8 @@ WHITESPACE [ \t\f\r\v]+
 LETTER [a-zA-Z]
 DIGIT [0-9]
 ESCAPE_SEQUENCE \\[nt\\'afrbv0]
+CHARACTER [ -~]{-}[\\'"]
+MULTI_LINE_SEQUENCE \\\n
 
 %%
 {WHITESPACE} {}
@@ -101,25 +105,36 @@ ESCAPE_SEQUENCE \\[nt\\'afrbv0]
 	st.printAllScopeTables(logout);
 }
 
-'({ESCAPE_SEQUENCE}|[ -~]{-}[\\'"])' {
+'({ESCAPE_SEQUENCE}|{CHARACTER})' {
 	string temp = yytext;
 	temp.erase(0,1);
 	temp.pop_back();
-	cout << temp << endl;
-	char c;
-	if(temp[0] == '\\') {
-		c = getEscapeSeqValue(temp[1]);
-	}
-	else {
-		c = temp[0];
-	}
-	cout << c;
-	string token = string("<CONST_CHAR, ") + c + "> ";
+	
+	temp = replaceWithEscapeSeq(temp);
+	
+	string token = string("<CONST_CHAR, ") + temp + "> ";
 	tokenout <<  token;
 	logout << "Line no " << line_count << " TOKEN <CONST_CHAR> Lexeme " << yytext << " found --> " << token << "\n";
 	st.insert(yytext, "CONST_CHAR"); 
 	st.printAllScopeTables(logout);
 }
+
+\"({ESCAPE_SEQUENCE}|{CHARACTER}|{MULTI_LINE_SEQUENCE})*\" {
+	string temp = yytext;
+	temp.erase(0,1);
+	temp.pop_back();
+	
+	temp = replaceWithEscapeSeq(temp);
+	
+	string token = string("<STRING, ") + temp + "> ";
+	tokenout <<  token;
+	logout << "Line no " << line_count << " TOKEN <STRING> Lexeme " << yytext << " found --> " << token << "\n";
+}
+
+(\/\/(.|{MULTI_LINE_SEQUENCE})*)|(\/\*(.|[\n])*\*\/) {//    /**/*/ EITA BAAKI  (\/\/.*)|
+	logout << "Line no " << line_count << " TOKEN <COMMENT> Lexeme " << yytext << " found\n";
+}
+
 %%
 
 int main(int argc,char *argv[]){	

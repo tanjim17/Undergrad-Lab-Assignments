@@ -537,44 +537,7 @@ ScopeTable # 1
 Line no 15 TOKEN <LTHIRD> Lexeme [ found
 Line no 15 TOKEN <RTHIRD> Lexeme ] found
 Line no 15 TOKEN <ASSIGNOP> Lexeme = found
-Line no 15 TOKEN <ID> Lexeme ab found
-ScopeTable # 1.1
-0 --> <b : ID> <1 : CONST_INT> <ch : ID> <'a' : CONST_CHAR> 
-1 --> <x : ID> <c : ID> 
-2 --> 
-3 --> 
-4 --> 
-5 --> <12.1 : CONST_FLOAT> 
-6 --> <a : ID> <'\t' : CONST_CHAR> <ab : ID> 
-
-ScopeTable # 1
-0 --> 
-1 --> <main : ID> 
-2 --> 
-3 --> 
-4 --> 
-5 --> 
-6 --> 
-
-Line no 15 TOKEN <ID> Lexeme td found
-ScopeTable # 1.1
-0 --> <b : ID> <1 : CONST_INT> <ch : ID> <'a' : CONST_CHAR> 
-1 --> <x : ID> <c : ID> 
-2 --> 
-3 --> 
-4 --> 
-5 --> <12.1 : CONST_FLOAT> 
-6 --> <a : ID> <'\t' : CONST_CHAR> <ab : ID> <td : ID> 
-
-ScopeTable # 1
-0 --> 
-1 --> <main : ID> 
-2 --> 
-3 --> 
-4 --> 
-5 --> 
-6 --> 
-
+Line no 15 TOKEN <STRING> Lexeme "ab\td" found --> <STRING, ab	d> 
 Line no 15 TOKEN <SEMICOLON> Lexeme ; found
 Line no 16 TOKEN <ID> Lexeme printf found
 ScopeTable # 1.1
@@ -584,7 +547,7 @@ ScopeTable # 1.1
 3 --> 
 4 --> 
 5 --> <12.1 : CONST_FLOAT> 
-6 --> <a : ID> <'\t' : CONST_CHAR> <ab : ID> <td : ID> 
+6 --> <a : ID> <'\t' : CONST_CHAR> 
 
 ScopeTable # 1
 0 --> 
@@ -596,163 +559,27 @@ ScopeTable # 1
 6 --> 
 
 Line no 16 TOKEN <LPAREN> Lexeme ( found
-Line no 16 TOKEN <ID> Lexeme abc found
-ScopeTable # 1.1
-0 --> <b : ID> <1 : CONST_INT> <ch : ID> <'a' : CONST_CHAR> <abc : ID> 
-1 --> <x : ID> <c : ID> <printf : ID> 
-2 --> 
-3 --> 
-4 --> 
-5 --> <12.1 : CONST_FLOAT> 
-6 --> <a : ID> <'\t' : CONST_CHAR> <ab : ID> <td : ID> 
-
-ScopeTable # 1
-0 --> 
-1 --> <main : ID> 
-2 --> 
-3 --> 
-4 --> 
-5 --> 
-6 --> 
-
-Line no 17 TOKEN <ID> Lexeme def found
-ScopeTable # 1.1
-0 --> <b : ID> <1 : CONST_INT> <ch : ID> <'a' : CONST_CHAR> <abc : ID> 
-1 --> <x : ID> <c : ID> <printf : ID> 
-2 --> <def : ID> 
-3 --> 
-4 --> 
-5 --> <12.1 : CONST_FLOAT> 
-6 --> <a : ID> <'\t' : CONST_CHAR> <ab : ID> <td : ID> 
-
-ScopeTable # 1
-0 --> 
-1 --> <main : ID> 
-2 --> 
-3 --> 
-4 --> 
-5 --> 
-6 --> 
-
-Line no 18 TOKEN <ID> Lexeme ghi found
-ScopeTable # 1.1
-0 --> <b : ID> <1 : CONST_INT> <ch : ID> <'a' : CONST_CHAR> <abc : ID> 
-1 --> <x : ID> <c : ID> <printf : ID> 
-2 --> <def : ID> 
-3 --> 
-4 --> <ghi : ID> 
-5 --> <12.1 : CONST_FLOAT> 
-6 --> <a : ID> <'\t' : CONST_CHAR> <ab : ID> <td : ID> 
-
-ScopeTable # 1
-0 --> 
-1 --> <main : ID> 
-2 --> 
-3 --> 
-4 --> 
-5 --> 
-6 --> 
-
-Line no 18 TOKEN <RPAREN> Lexeme ) found
-Line no 18 TOKEN <SEMICOLON> Lexeme ; found
-Line no 19 TOKEN <MULOP> Lexeme / found
-Line no 19 TOKEN <MULOP> Lexeme / found
-Line no 19 TOKEN <ID> Lexeme a found
-ScopeTable # 1.1
-0 --> <b : ID> <1 : CONST_INT> <ch : ID> <'a' : CONST_CHAR> <abc : ID> 
-1 --> <x : ID> <c : ID> <printf : ID> 
-2 --> <def : ID> 
-3 --> 
-4 --> <ghi : ID> 
-5 --> <12.1 : CONST_FLOAT> 
-6 --> <a : ID> <'\t' : CONST_CHAR> <ab : ID> <td : ID> 
-
-ScopeTable # 1
-0 --> 
-1 --> <main : ID> 
-2 --> 
-3 --> 
-4 --> 
-5 --> 
-6 --> 
-
-Line no 19 TOKEN <ID> Lexeme comment found
-ScopeTable # 1.1
-0 --> <b : ID> <1 : CONST_INT> <ch : ID> <'a' : CONST_CHAR> <abc : ID> 
-1 --> <x : ID> <c : ID> <printf : ID> 
-2 --> <def : ID> 
-3 --> 
-4 --> <ghi : ID> 
-5 --> <12.1 : CONST_FLOAT> 
-6 --> <a : ID> <'\t' : CONST_CHAR> <ab : ID> <td : ID> <comment : ID> 
-
-ScopeTable # 1
-0 --> 
-1 --> <main : ID> 
-2 --> 
-3 --> 
-4 --> 
-5 --> 
-6 --> 
-
-Line no 20 TOKEN <MULOP> Lexeme / found
-Line no 20 TOKEN <MULOP> Lexeme * found
-Line no 20 TOKEN <MULOP> Lexeme * found
-Line no 20 TOKEN <ID> Lexeme another found
-ScopeTable # 1.1
-0 --> <b : ID> <1 : CONST_INT> <ch : ID> <'a' : CONST_CHAR> <abc : ID> 
-1 --> <x : ID> <c : ID> <printf : ID> 
-2 --> <def : ID> 
-3 --> 
-4 --> <ghi : ID> <another : ID> 
-5 --> <12.1 : CONST_FLOAT> 
-6 --> <a : ID> <'\t' : CONST_CHAR> <ab : ID> <td : ID> <comment : ID> 
-
-ScopeTable # 1
-0 --> 
-1 --> <main : ID> 
-2 --> 
-3 --> 
-4 --> 
-5 --> 
-6 --> 
-
-Line no 21 TOKEN <MULOP> Lexeme * found
-Line no 21 TOKEN <MULOP> Lexeme * found
-Line no 21 TOKEN <MULOP> Lexeme * found
-Line no 21 TOKEN <ID> Lexeme comment found
-ScopeTable # 1.1
-0 --> <b : ID> <1 : CONST_INT> <ch : ID> <'a' : CONST_CHAR> <abc : ID> 
-1 --> <x : ID> <c : ID> <printf : ID> 
-2 --> <def : ID> 
-3 --> 
-4 --> <ghi : ID> <another : ID> 
-5 --> <12.1 : CONST_FLOAT> 
-6 --> <a : ID> <'\t' : CONST_CHAR> <ab : ID> <td : ID> <comment : ID> 
-
-ScopeTable # 1
-0 --> 
-1 --> <main : ID> 
-2 --> 
-3 --> 
-4 --> 
-5 --> 
-6 --> 
-
-Line no 21 TOKEN <MULOP> Lexeme * found
-Line no 21 TOKEN <MULOP> Lexeme * found
-Line no 21 TOKEN <MULOP> Lexeme * found
-Line no 21 TOKEN <MULOP> Lexeme / found
+Line no 16 TOKEN <STRING> Lexeme "abc\
+def\
+ghi" found --> <STRING, abcdefghi> 
+Line no 16 TOKEN <RPAREN> Lexeme ) found
+Line no 16 TOKEN <SEMICOLON> Lexeme ; found
+Line no 17 TOKEN <COMMENT> Lexeme // a comment found
+Line no 19 TOKEN <COMMENT> Lexeme // hey \
+hi \
+ found
+Line no 21 TOKEN <COMMENT> Lexeme /** another
+*** comment ***/ found
 Line no 22 TOKEN <RETURN> Lexeme return found
 Line no 22 TOKEN <CONST_INT> Lexeme 0 found
 ScopeTable # 1.1
-0 --> <b : ID> <1 : CONST_INT> <ch : ID> <'a' : CONST_CHAR> <abc : ID> 
+0 --> <b : ID> <1 : CONST_INT> <ch : ID> <'a' : CONST_CHAR> 
 1 --> <x : ID> <c : ID> <printf : ID> 
-2 --> <def : ID> 
+2 --> 
 3 --> 
-4 --> <ghi : ID> <another : ID> 
+4 --> 
 5 --> <12.1 : CONST_FLOAT> 
-6 --> <a : ID> <'\t' : CONST_CHAR> <ab : ID> <td : ID> <comment : ID> <0 : CONST_INT> 
+6 --> <a : ID> <'\t' : CONST_CHAR> <0 : CONST_INT> 
 
 ScopeTable # 1
 0 --> 
