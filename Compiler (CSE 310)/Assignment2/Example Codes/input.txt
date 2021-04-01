@@ -1,0 +1,23 @@
+int main(){
+	int a,b;
+	a=a+1;
+	float x = 12.1;
+	
+	if(a == 1) {
+		a = 2;
+	}
+	else {
+		a = 3||3;
+		b = 3&&3;
+	}
+	char ch='a';
+	ch='\t';
+	char c[]="ab\td";
+	printf("abc\
+def\
+ghi");
+// a comment
+/** another
+*** comment ***/
+	return 0;
+}	
