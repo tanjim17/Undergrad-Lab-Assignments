@@ -104,6 +104,7 @@ LETTER [a-zA-Z]
 DIGIT [0-9]
 ESCAPE_SEQUENCE \\[nt\\'\"afrbv0]
 CHARACTER [^\\'\"\n]
+FLOAT ({DIGIT}+|({DIGIT}*\.{DIGIT}+))(E[\+\-]?{DIGIT}+)?
 
 %%
 
@@ -144,7 +145,7 @@ CHARACTER [^\\'\"\n]
 	handleScopeTable("CONST_INT");
 }	
 
-({DIGIT}+|({DIGIT}*\.{DIGIT}+))(E[\+\-]?{DIGIT}+)? { //floating point
+{FLOAT} { //floating point
 	printTokenAndLog("CONST_FLOAT");
 	handleScopeTable("CONST_FLOAT");
 }
@@ -193,7 +194,7 @@ CHARACTER [^\\'\"\n]
 
 ({DIGIT}|\.)+ {handleError("Too many decimal points");}
 
-({DIGIT}|{LETTER}|_)+ {handleError("Invalid prefix on ID or invalid suffix on Number");}
+({DIGIT}|{LETTER}|_)+|{FLOAT}({LETTER}|_)+ {handleError("Invalid prefix on ID or invalid suffix on Number");}
 
 ({DIGIT}|\.)*E[\+\-]?({DIGIT}|\.)* {handleError("Ill formed number");}
 
