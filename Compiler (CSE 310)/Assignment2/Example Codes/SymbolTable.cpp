@@ -45,11 +45,13 @@ class ScopeTable {
     ScopeTable* parent;
     string id;
     int lastChildId; // for tracking scope table id
+    int* tokenCount;
 
 public:
     ScopeTable(int numOfBuckets, ScopeTable* parent, int id) {
         this->numOfBuckets = numOfBuckets;
         buckets = new SymbolInfo*[numOfBuckets];
+        tokenCount = new int[numOfBuckets]();
         for(int i=0; i<numOfBuckets; i++)
             buckets[i] = NULL;
         this->parent = parent;
@@ -60,29 +62,29 @@ public:
         lastChildId = 0;
     }
 
-    bool insert(string name, string type) {
+    bool insert(string name, string type, ofstream& fout) {
         int bucketNo = hash_(name, numOfBuckets);
         SymbolInfo* current = buckets[bucketNo];
         if(current == NULL) {
             buckets[bucketNo] = new SymbolInfo(name, type);
-            fout << "Inserted in ScopeTable # " + id + " at position " << bucketNo << ", 0" << endl;
+            tokenCount[bucketNo] ++;
             return true;
         }
         if(current->getName() == name) {
-            fout << "<" + name + ", " + current->getType() + "> already exists in current ScopeTable\n";
+            fout << name + " already exists in current ScopeTable\n\n";
             return false;
         }
         int index = 1;
         while(current->getNext() != NULL) {
             if(current->getNext()->getName() == name) {
-                fout << "<" + name + ", " + current->getNext()->getType() + "> already exists in ScopeTable\n";
+                fout << name + " already exists in current ScopeTable\n\n";
                 return false;
             }
             current = current->getNext();
             index ++;
         }
         current->setNext(new SymbolInfo(name, type));
-        fout << "Inserted in ScopeTable # " + id + " at position " << bucketNo << ", " << index << endl;
+        tokenCount[bucketNo] ++;
         return true;
     }
 
@@ -110,6 +112,7 @@ public:
         }
         if(current->getName() == name) {
             fout << "Deleted entry " << bucketNo << ", 0 from current ScopeTable\n";
+            tokenCount[bucketNo] --;
             buckets[bucketNo] = current->getNext();
             delete current;
             return true;
@@ -118,6 +121,7 @@ public:
         while(current->getNext() != NULL) {
             if(current->getNext()->getName() == name) {
                 fout << "Deleted entry " << bucketNo << ", " << index << " from current ScopeTable\n";
+                tokenCount[bucketNo] --;
                 SymbolInfo* temp = current->getNext();
                 current->setNext(temp->getNext());
                 delete temp;
@@ -133,10 +137,11 @@ public:
     void print(ofstream& fout) {
         fout << "ScopeTable # " + id << endl;
         for(int i=0; i<numOfBuckets; i++) {
-            fout << i << " --> ";
+            if(tokenCount[i] == 0) continue;        
+            fout << " " << i << " --> ";
             SymbolInfo* current = buckets[i];
             while(current != NULL) {
-                fout << "<" << current->getName() << " : " << current->getType() << "> ";
+                fout << "< " << current->getName() << " : " << current->getType() << "> ";
                 current = current->getNext();
             }
             fout << endl;
@@ -161,6 +166,7 @@ public:
             }
         }
         delete[] buckets;
+        delete[] tokenCount;
     }
 };
 
@@ -186,8 +192,8 @@ public:
         currentScopeTable = temp;
     }
 
-    bool insert(string name, string type) {
-        return currentScopeTable->insert(name, type);
+    bool insert(string name, string type, ofstream& fout) {
+        return currentScopeTable->insert(name, type, fout);
     }
 
     bool delete_(string name) {

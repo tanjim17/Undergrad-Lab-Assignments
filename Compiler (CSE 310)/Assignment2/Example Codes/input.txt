@@ -1,28 +1,9 @@
-int main(){
-	int a,b;
-	a=a+1;
-	float x = 12.1;
-	
-	if(a == 1) {
-		a = 2;
-	}
-	else {
-		a = 3||3;
-		b = 3&&3;
-	}
-	char ch='a';
-	ch='\t';
-	char c[]="ab\td";
-	printf("abc\
-def\
-ghi");
-// a comment
+a = 12 && a;
+b = && x++; x ++; x+++;
 
-// hey \
-hi \
+a = '	';
 
-
-/** another
-*** comment ***/
-	return 0;
-}	
+2E-12.
+E2
+E+1
+E.

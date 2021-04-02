@@ -1,5 +1,7 @@
 %option noyywrap
 
+%x COMMENT_STATE
+
 %{
 #include<bits/stdc++.h>
 #include "SymbolTable.cpp"
@@ -10,18 +12,10 @@ ofstream tokenout;
 
 SymbolTable st(7);
 int line_count;
-
-void printKeywordToken() {
-	string upperCaseKeyword = yytext;
-	transform(upperCaseKeyword.begin(), upperCaseKeyword.end(), upperCaseKeyword.begin(), ::toupper);
-	tokenout << "<" << upperCaseKeyword << "> ";
-	logout << "Line no " << line_count << " TOKEN <" << upperCaseKeyword << "> Lexeme " << yytext << " found\n";
-}
-
-void printOperatorToken(string type) {
-	tokenout << "<" + type + ", " << yytext << "> ";
-	logout << "Line no " << line_count << " TOKEN <" + type + "> Lexeme " << yytext << " found\n";
-}
+int error_count;
+bool hasCommentEnded;
+bool hasWrongEscapeSeq;
+string comment;
 
 string replaceWithEscapeSeq(string s) {
 	for(int i=0; i<s.size(); i++) {
@@ -44,95 +38,184 @@ string replaceWithEscapeSeq(string s) {
 					s[i] = '\v'; break;
 				case '0':
 					s[i] = '\0'; break;
+				case '\"':
+				case '\'':
+				case '\\':
+					break;
 				case '\n': //for multiline string
 					s.erase(i, 1); break;
+				case '\r': //for multiline string
+					if(s[i+1] == '\n') s.erase(i, 2);
+					else hasWrongEscapeSeq = 1;
+					break;
+				default:
+					hasWrongEscapeSeq = 1;
 			}
         }
     }
     return s;
 }
 
+int countNewLines(string s) { //newlines that occured inside multi-line string, comment etc
+	int count = 0;
+	for(int i=0; i<s.size(); i++) {
+		if(s[i] == '\n') count ++;
+	}
+	return count;
+}
+
+void printKeywordToken(string tokenName) {
+	tokenout << "<" + tokenName << "> ";
+}
+
+string printToken(string tokenName, string tokenAttribute = yytext) {
+	string token =  string("<") + tokenName + ", " + tokenAttribute + "> ";
+	tokenout << token;
+	return token;
+}
+
+void printLog(string tokenName, string token = "") {
+	logout << "Line no " << line_count << ": Token <" + tokenName + "> Lexeme " << yytext << " found";
+	if(token != "")
+		logout << " --> " << token;
+	logout << "\n\n";
+}
+
+void printTokenAndLog(string tokenName) {
+	printToken(tokenName);
+	printLog(tokenName);
+}
+
+void handleError(string message, string lexeme = yytext) {
+	logout << "Error at line no " << line_count << ": " << message << " " << lexeme << "\n\n";
+	error_count ++;
+}
+
+void handleScopeTable(string tokenName) {
+	if(st.insert(yytext, tokenName, logout))
+		st.printAllScopeTables(logout);
+}
 %}
 
+NEWLINE (\n|\r\n)
 KEYWORD (if|else|for|while|do|break|int|char|float|double|void|return|switch|case|default|continue)
 WHITESPACE [ \t\f\r\v]+ 
 LETTER [a-zA-Z]
 DIGIT [0-9]
-ESCAPE_SEQUENCE \\[nt\\'afrbv0]
-CHARACTER [ -~]{-}[\\'"]
-MULTI_LINE_SEQUENCE \\\n
-
+ESCAPE_SEQUENCE \\[nt\\'\"afrbv0]
+CHARACTER [^\\'\"]
 %%
+
 {WHITESPACE} {}
-[\n] {line_count ++;}
-{KEYWORD} {printKeywordToken();}
 
-[\+\-] {printOperatorToken("ADDOP");}
+{NEWLINE} {line_count ++;}
 
-("++"|"--") {printOperatorToken("INCOP");}
-[\*/%] {printOperatorToken("MULOP");}
-("<"|"<="|">"|">="|"=="|"!=") {printOperatorToken("RELOP");}
-"=" {printOperatorToken("ASSIGNOP");}
-("&&"|"||") {printOperatorToken("LOGICOP");} //confused
-"!" {printOperatorToken("NOT");}
-"(" {printOperatorToken("LPAREN");}
-")" {printOperatorToken("RPAREN");}
-"{" {printOperatorToken("LCURL"); st.enterScope();}
-"}" {printOperatorToken("RCURL"); st.exitScope();}
-"[" {printOperatorToken("LTHIRD");}
-"]" {printOperatorToken("RTHIRD");}
-"," {printOperatorToken("COMMA");}
-";" {printOperatorToken("SEMICOLON");}
-	
-{LETTER}+({LETTER}|{DIGIT}|_)* {
-	tokenout << "<ID, " << yytext << "> ";
-	logout << "Line no " << line_count << " TOKEN <ID> Lexeme " << yytext << " found\n";
-	st.insert(yytext, "ID");
-	st.printAllScopeTables(logout);
+{KEYWORD} {
+	string tokenName = yytext;
+	transform(tokenName.begin(), tokenName.end(), tokenName.begin(), ::toupper);
+	printKeywordToken(tokenName);
+	printLog(tokenName);
 }
 
-{DIGIT}+ {
-	tokenout << "<CONST_INT, " << yytext << "> ";
-	logout << "Line no " << line_count << " TOKEN <CONST_INT> Lexeme " << yytext << " found\n";
-	st.insert(yytext, "CONST_INT");
-	st.printAllScopeTables(logout);
+[\+\-] {printTokenAndLog("ADDOP");}
+[\*\/%] {printTokenAndLog("MULOP");}
+("++"|"--") {printTokenAndLog("INCOP");}
+("<"|"<="|">"|">="|"=="|"!=") {printTokenAndLog("RELOP");}
+"=" {printTokenAndLog("ASSIGNOP");}
+("&&"|"||") {printTokenAndLog("LOGICOP");}
+"!" {printTokenAndLog("NOT");}
+"(" {printTokenAndLog("LPAREN");}
+")" {printTokenAndLog("RPAREN");}
+"{" {printTokenAndLog("LCURL"); st.enterScope();}
+"}" {printTokenAndLog("RCURL"); st.exitScope();}
+"[" {printTokenAndLog("LTHIRD");}
+"]" {printTokenAndLog("RTHIRD");}
+"," {printTokenAndLog("COMMA");}
+";" {printTokenAndLog("SEMICOLON");}
+	
+({LETTER}|_)+({LETTER}|{DIGIT}|_)* { //identifier
+	printTokenAndLog("ID");
+	handleScopeTable("ID");
+}
+
+{DIGIT}+ { //integer
+	printTokenAndLog("CONST_INT");
+	handleScopeTable("CONST_INT");
 }	
 
-{DIGIT}+\.{DIGIT}+(E[+-]?{DIGIT}+)? {
-	tokenout << "<CONST_FLOAT, " << yytext << "> ";
-	logout << "Line no " << line_count << " TOKEN <CONST_FLOAT> Lexeme " << yytext << " found\n";
-	st.insert(yytext, "CONST_FLOAT");
-	st.printAllScopeTables(logout);
+{DIGIT}*\.{DIGIT}+(E[\+\-]?{DIGIT}+)? { //floating point
+	printTokenAndLog("CONST_FLOAT");
+	handleScopeTable("CONST_FLOAT");
 }
 
-'({ESCAPE_SEQUENCE}|{CHARACTER})' {
+'({ESCAPE_SEQUENCE}|{CHARACTER})' { //character
 	string temp = yytext;
 	temp.erase(0,1);
 	temp.pop_back();
 	
 	temp = replaceWithEscapeSeq(temp);
 	
-	string token = string("<CONST_CHAR, ") + temp + "> ";
-	tokenout <<  token;
-	logout << "Line no " << line_count << " TOKEN <CONST_CHAR> Lexeme " << yytext << " found --> " << token << "\n";
-	st.insert(yytext, "CONST_CHAR"); 
-	st.printAllScopeTables(logout);
+	string token = printToken("CONST_CHAR", temp);
+	printLog("CONST_CHAR", token);
+	handleScopeTable("CONST_CHAR");
 }
 
-\"({ESCAPE_SEQUENCE}|{CHARACTER}|{MULTI_LINE_SEQUENCE})*\" {
+\"((\\.)|{CHARACTER}|(\\{NEWLINE}))*\" { //string
 	string temp = yytext;
 	temp.erase(0,1);
 	temp.pop_back();
 	
 	temp = replaceWithEscapeSeq(temp);
 	
-	string token = string("<STRING, ") + temp + "> ";
-	tokenout <<  token;
-	logout << "Line no " << line_count << " TOKEN <STRING> Lexeme " << yytext << " found --> " << token << "\n";
+	if(hasWrongEscapeSeq) {
+		handleError("Wrong Escape Sequence");
+	}
+	else {
+		string token = printToken("STRING", temp);
+		printLog("STRING", token);
+	}
+	hasWrongEscapeSeq = 0;
+	line_count += countNewLines(yytext);
 }
 
-(\/\/(.|{MULTI_LINE_SEQUENCE})*)|(\/\*(.|[\n])*\*\/) {//    /**/*/ EITA BAAKI  (\/\/.*)|
-	logout << "Line no " << line_count << " TOKEN <COMMENT> Lexeme " << yytext << " found\n";
+(\/\/(.|(\\{NEWLINE}))*) { //single-line comment
+	printLog("COMMENT");
+	line_count += countNewLines(yytext);
+}
+
+\/\* { //multi-line comment
+	hasCommentEnded = 0;
+	comment = yytext;
+	yymore();
+	BEGIN COMMENT_STATE;
+}
+
+({DIGIT}|\.)+ {handleError("Too many decimal points");}
+
+({DIGIT}|[\.E])+ {handleError("Ill formed number");}
+
+({DIGIT}|{LETTER}|_)+ {handleError("Invalid prefix on ID or invalid suffix on Number");}
+
+'' {handleError("Empty character constant error");}
+
+('[^'\r\n]*)|('[\\\"]') {handleError("Unterminated character");}
+
+'[^'\r\n]+' {handleError("Multi character constant error");}
+
+\"((\\.)|{CHARACTER}|(\\{NEWLINE}))* {
+	handleError("Unterminated String");
+	line_count += countNewLines(yytext);
+}
+
+. {handleError("Unrecognized character");}
+
+<COMMENT_STATE>.|\n {comment = yytext; yymore();}
+
+<COMMENT_STATE>\*\/ {
+	hasCommentEnded = 1;
+	printLog("COMMENT");
+	line_count += countNewLines(yytext);
+	BEGIN INITIAL;
 }
 
 %%
@@ -154,13 +237,22 @@ int main(int argc,char *argv[]){
 	
 	yyin= fin;
 	line_count = 1;
+	error_count = 0;
+	hasCommentEnded = 1;
+	hasWrongEscapeSeq = 0;
+	
 	yylex();
+	
+	if(!hasCommentEnded) {
+		handleError("Unterminated Comment", comment);
+		line_count += countNewLines(comment);
+	}
+	st.printAllScopeTables(logout);
+	logout << "Total lines: " << line_count << "\nTotal errors: " << error_count << "\n";
+	
 	fclose(yyin);
 	tokenout.close();
 	logout.close();
+
 	return 0;
-	/*
-	
-	
-	*/
 }
