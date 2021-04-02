@@ -1,0 +1,7 @@
+Error at line no 1: Wrong Escape Sequence "ald\
+a\kj"
+
+ScopeTable # 1
+
+Total lines: 2
+Total errors: 1

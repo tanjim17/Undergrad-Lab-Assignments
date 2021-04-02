@@ -37,7 +37,7 @@ string replaceWithEscapeSeq(string s) {
 				case 'v':
 					s[i] = '\v'; break;
 				case '0':
-					s[i] = '\0'; break;
+					s[i] = ' '; break;
 				case '\"':
 				case '\'':
 				case '\\':
@@ -103,7 +103,8 @@ WHITESPACE [ \t\f\r\v]+
 LETTER [a-zA-Z]
 DIGIT [0-9]
 ESCAPE_SEQUENCE \\[nt\\'\"afrbv0]
-CHARACTER [^\\'\"]
+CHARACTER [^\\'\"\n]
+
 %%
 
 {WHITESPACE} {}
@@ -143,7 +144,7 @@ CHARACTER [^\\'\"]
 	handleScopeTable("CONST_INT");
 }	
 
-{DIGIT}*\.{DIGIT}+(E[\+\-]?{DIGIT}+)? { //floating point
+({DIGIT}+|({DIGIT}*\.{DIGIT}+))(E[\+\-]?{DIGIT}+)? { //floating point
 	printTokenAndLog("CONST_FLOAT");
 	handleScopeTable("CONST_FLOAT");
 }
@@ -192,9 +193,9 @@ CHARACTER [^\\'\"]
 
 ({DIGIT}|\.)+ {handleError("Too many decimal points");}
 
-({DIGIT}|[\.E])+ {handleError("Ill formed number");}
-
 ({DIGIT}|{LETTER}|_)+ {handleError("Invalid prefix on ID or invalid suffix on Number");}
+
+({DIGIT}|\.)*E[\+\-]?({DIGIT}|\.)* {handleError("Ill formed number");}
 
 '' {handleError("Empty character constant error");}
 
@@ -232,8 +233,8 @@ int main(int argc,char *argv[]){
 		return 0;
 	}
 	
-	logout.open("log.txt");
-	tokenout.open("token.txt");
+	logout.open("1705032_log.txt");
+	tokenout.open("1705032_token.txt");
 	
 	yyin= fin;
 	line_count = 1;
@@ -248,6 +249,9 @@ int main(int argc,char *argv[]){
 		line_count += countNewLines(comment);
 	}
 	st.printAllScopeTables(logout);
+	
+	fseek(fin, -1, SEEK_END);
+	if(fgetc(fin) == '\n') line_count --;
 	logout << "Total lines: " << line_count << "\nTotal errors: " << error_count << "\n";
 	
 	fclose(yyin);
