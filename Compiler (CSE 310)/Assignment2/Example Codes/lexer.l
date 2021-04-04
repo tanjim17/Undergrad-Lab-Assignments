@@ -104,7 +104,7 @@ LETTER [a-zA-Z]
 DIGIT [0-9]
 ESCAPE_SEQUENCE \\[nt\\'\"afrbv0]
 CHARACTER [^\\'\"\n]
-FLOAT ({DIGIT}+|({DIGIT}*\.{DIGIT}+))(E[\+\-]?{DIGIT}+)?
+FLOAT ({DIGIT}+|({DIGIT}*\.{DIGIT}*))(E[\+\-]?{DIGIT}+)?
 
 %%
 
@@ -150,7 +150,7 @@ FLOAT ({DIGIT}+|({DIGIT}*\.{DIGIT}+))(E[\+\-]?{DIGIT}+)?
 	handleScopeTable("CONST_FLOAT");
 }
 
-'({ESCAPE_SEQUENCE}|{CHARACTER})' { //character
+'({ESCAPE_SEQUENCE}|{CHARACTER}|\")' { //character
 	string temp = yytext;
 	temp.erase(0,1);
 	temp.pop_back();
@@ -162,11 +162,12 @@ FLOAT ({DIGIT}+|({DIGIT}*\.{DIGIT}+))(E[\+\-]?{DIGIT}+)?
 	handleScopeTable("CONST_CHAR");
 }
 
-\"((\\.)|{CHARACTER}|(\\{NEWLINE}))*\" { //string
+\"((\\.)|{CHARACTER}|'|(\\{NEWLINE}))*\" { //string
 	string temp = yytext;
 	temp.erase(0,1);
 	temp.pop_back();
 	
+	hasWrongEscapeSeq = 0;
 	temp = replaceWithEscapeSeq(temp);
 	
 	if(hasWrongEscapeSeq) {
@@ -176,7 +177,6 @@ FLOAT ({DIGIT}+|({DIGIT}*\.{DIGIT}+))(E[\+\-]?{DIGIT}+)?
 		string token = printToken("STRING", temp);
 		printLog("STRING", token);
 	}
-	hasWrongEscapeSeq = 0;
 	line_count += countNewLines(yytext);
 }
 
@@ -200,11 +200,11 @@ FLOAT ({DIGIT}+|({DIGIT}*\.{DIGIT}+))(E[\+\-]?{DIGIT}+)?
 
 '' {handleError("Empty character constant error");}
 
-('[^'\r\n]*)|('[\\\"]') {handleError("Unterminated character");}
+'[^'\r\n]*|'\\' {handleError("Unterminated character");}
 
 '[^'\r\n]+' {handleError("Multi character constant error");}
 
-\"((\\.)|{CHARACTER}|(\\{NEWLINE}))* {
+\"([^\"\r\n]*|(\\{NEWLINE}))* {
 	handleError("Unterminated String");
 	line_count += countNewLines(yytext);
 }
