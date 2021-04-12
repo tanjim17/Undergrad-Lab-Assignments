@@ -9,12 +9,14 @@ class SymbolInfo {
     string dataType;
     SymbolInfo* next;
     vector<string> paramTypes;
+    bool isFunction;
 
 public:
-    SymbolInfo(string name, string type, string dataType = "", vector<string> paramTypes = {}) {
+    SymbolInfo(string name, string type, string dataType = "", bool isFunction = 0, vector<string> paramTypes = {}) {
         this->name = name;
         this->type = type;
         this->dataType = dataType;
+        this->isFunction = isFunction;
         this->paramTypes = paramTypes;
         next = NULL;
     }
@@ -24,6 +26,7 @@ public:
     string getName() {return name;}
     string getType() {return type;}
     string getDataType() {return dataType;}
+    bool getIsFunction() {return isFunction;}
     vector<string> getParamTypes() {return paramTypes;}
     SymbolInfo* getNext() {return next;}
 };

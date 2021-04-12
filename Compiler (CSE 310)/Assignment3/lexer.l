@@ -217,14 +217,14 @@ FLOAT ({DIGIT}+|({DIGIT}*\.{DIGIT}*))(E[\+\-]?{DIGIT}+)?
 {DIGIT}+ { //integer
 	printTokenAndLog("CONST_INT");
 	handleScopeTable("CONST_INT");
-	yylval.x = new SymbolInfo(yytext, "CONST_INT");
+	yylval.x = new SymbolInfo(yytext, "CONST_INT", "int");
 	return CONST_INT;
 }	
 
 {FLOAT} { //floating point
 	printTokenAndLog("CONST_FLOAT");
 	handleScopeTable("CONST_FLOAT");
-	yylval.x = new SymbolInfo(yytext, "CONST_FLOAT");
+	yylval.x = new SymbolInfo(yytext, "CONST_FLOAT", "float");
 	return CONST_FLOAT;
 }
 

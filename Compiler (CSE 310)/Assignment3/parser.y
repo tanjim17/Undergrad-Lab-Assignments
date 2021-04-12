@@ -13,6 +13,8 @@ ofstream log_;
 ofstream error;
 bool hasScopeStarted;
 vector<pair<string, bool>> declaration_list; // bool value  determines if its an array
+vector<string> argumentTypes;
+vector<string> undefinedFunctions;
 
 extern FILE* yyin;
 extern int line_count;
@@ -65,7 +67,9 @@ void insertParamsInSymbolTable(string s) {
     	if(token == "int" || token == "float") {
 			currentDataType = token;
     	} else {
-    		st.insert(new SymbolInfo(token, "ID", currentDataType));
+    		if( !st.insert(new SymbolInfo(token, "ID", currentDataType)) ) {
+    			printError("Multiple Declaration of " + token);
+    		}
     	}
     }
 }
@@ -105,6 +109,36 @@ bool verifyWithDeclaration(string returnType, string name, vector<string> paramT
 	}
 }
 
+void checkAndInsertFunc(string returnType, string name, vector<string> paramTypes = {}) {
+	SymbolInfo* funcInfo = st.lookUp(name);
+	if(funcInfo == NULL) {
+		st.insert( new SymbolInfo(name, "ID", returnType, 1, paramTypes) );
+	} else {
+		if (find(undefinedFunctions.begin(), undefinedFunctions.end(), name) != undefinedFunctions.end()) {
+			undefinedFunctions.erase(remove(undefinedFunctions.begin(), undefinedFunctions.end(), name), undefinedFunctions.end());
+			if(!verifyWithDeclaration(returnType, name, paramTypes)) {
+				printError("Function Declaration MisMatch");
+			} 
+		} else {
+			printError("Multiple Definition of " + name);
+		}		
+	}
+}
+
+void verifyFunctionCall(SymbolInfo* funcInfo) {
+	if(funcInfo->getDataType() == "void") {
+		printError("Void function in expression"); return;
+	}
+	vector<string> declaredParamTypes = funcInfo->getParamTypes();
+	if(argumentTypes.size() != declaredParamTypes.size()) {
+		printError("Argument number mismatch"); return;
+	}
+	for(int i=0; i<argumentTypes.size(); i++) {
+		if(argumentTypes[i] != declaredParamTypes[i]) {
+			printError("Argument type mismatch"); return;
+		}
+	}
+}
 
 %}
 
@@ -139,55 +173,48 @@ unit : var_declaration {printLog("unit : var_declaration", $1->getName());}
      ;
      
 func_declaration : type_specifier ID LPAREN parameter_list RPAREN SEMICOLON {
-	st.insert( new SymbolInfo($2->getName(), "ID", $1->getName(), getParamTypes($4->getName())) );
-	$$ = new SymbolInfo($1->getName() + " " + $2->getName() + "(" + $4->getName() + ");", "func_declaration");
+	string name = $2->getName();
+	if(!st.insert( new SymbolInfo(name, "ID", $1->getName(), 1, getParamTypes($4->getName())) )) {
+		printError("Multiple declaration of " + name);
+	};
+	$$ = new SymbolInfo($1->getName() + " " + name + "(" + $4->getName() + ");", "func_declaration");
+	undefinedFunctions.push_back(name);
 	printLog("func_declaration : type_specifier ID LPAREN parameter_list RPAREN SEMICOLON", $$->getName());
 }
 		| type_specifier ID LPAREN RPAREN SEMICOLON {
-	st.insert( new SymbolInfo($2->getName(), "ID", $1->getName()) );
-	$$ = new SymbolInfo($1->getName() + " " + $2->getName() + "();", "func_declaration");
+	string name = $2->getName();
+	if(!st.insert( new SymbolInfo(name, "ID", $1->getName(), 1) )) {
+		printError("Multiple declaration of " + name);
+	};
+	$$ = new SymbolInfo($1->getName() + " " + name + "();", "func_declaration");
+	undefinedFunctions.push_back(name);
 	printLog("func_declaration : type_specifier ID LPAREN RPAREN SEMICOLON", $$->getName());
 }
 		;
 		 
 func_definition : type_specifier ID LPAREN parameter_list RPAREN {
 	vector<string> paramTypes = getParamTypes($4->getName());
-	
-	SymbolInfo* funcInfo = st.lookUp($2->getName());
-	if(funcInfo == NULL) {
-		st.insert( new SymbolInfo($2->getName(), "ID", $1->getName(), paramTypes) );
-	} else {
-		if(!verifyWithDeclaration($1->getName(), $2->getName(), paramTypes)) {
-			printError("Function Declaration MisMatch");
-		} 
-	}
-	
+	checkAndInsertFunc($1->getName(), $2->getName(), paramTypes);
 	st.enterScope();
 	insertParamsInSymbolTable($4->getName());
 	hasScopeStarted = 1;
 } compound_statement {
 	$$ = new SymbolInfo($1->getName() + " " + $2->getName() + "(" + $4->getName() + ")" + $7->getName(), "func_definition");
+	undefinedFunctions.clear();
 	st.exitScope();
 	printLog("func_definition : type_specifier ID LPAREN parameter_list RPAREN compound_statement", $$->getName());
 }
 		| type_specifier ID LPAREN RPAREN {	
-	SymbolInfo* funcInfo = st.lookUp($2->getName());
-	if(funcInfo != NULL) {
-		st.insert( new SymbolInfo($2->getName(), "ID", $1->getName()) );
-	} else {
-		if(!verifyWithDeclaration($1->getName(), $2->getName())) {
-			printError("Function Declaration MisMatch");
-		} 
-	}
-	
+	checkAndInsertFunc($1->getName(), $2->getName());
 	st.enterScope();
 	hasScopeStarted = 1;	
 } compound_statement {
 	$$ = new SymbolInfo($1->getName() + " " + $2->getName() + "()" + $6->getName(), "func_definition");
+	undefinedFunctions.clear();
 	st.exitScope();
 	printLog("func_definition : type_specifier ID LPAREN RPAREN compound_statement", $$->getName());
 }
- 		;				
+ 		;
 
 
 parameter_list : parameter_list COMMA type_specifier ID {
@@ -298,54 +325,100 @@ expression_statement : SEMICOLON {printLog("expression_statement : SEMICOLON", $
 }
 			;
 	  
-variable : ID {printLog("variable : ID", $1->getName());}
+variable : ID {
+	string name = $1->getName();
+	SymbolInfo* temp = st.lookUp(name);
+	if(temp == NULL) {
+		printError("Undeclared Variable: " + name);
+	} else {
+		if(temp->getIsFunction())
+			printError(name + " is function, not variable"); // gotta write it in more places
+		string dataType = temp->getDataType();
+		if (dataType.find("array") != string::npos) //symbolinfo banaite hobe
+			 printError("Array without index");
+		else {
+			$$ = new SymbolInfo(name, "variable", dataType);
+			printLog("variable : ID", name);
+		}
+	}
+}
 	 | ID LTHIRD expression RTHIRD {
-	$$ = new SymbolInfo($1->getName() + "[" + $3->getName() + "]", "variable");
-	printLog("variable : ID LTHIRD expression RTHIRD", $$->getName());
+	if($3->getDataType() != "int") {
+		printError("Non-integer Array Index");
+	} else {
+		string name = $1->getName();
+		SymbolInfo* temp = st.lookUp(name);
+		if(temp == NULL) {
+			printError("Undeclared Variable: " + name);
+		} else {
+			string dataType = temp->getDataType();
+			if (dataType.find("array") != string::npos) { // todo: float index
+				$$ = new SymbolInfo(name + "[" + $3->getName() + "]", "variable", dataType.substr(0, dataType.find("_")));
+				printLog("variable : ID LTHIRD expression RTHIRD", name);
+			} else {
+				printError("Index without array");
+			}
+		}	
+	}
 }
 	 ;
 	 
- expression : logic_expression {printLog("expression : logic_expression", $1->getName());}
+expression : logic_expression {printLog("expression : logic_expression", $1->getName());}
 	   | variable ASSIGNOP logic_expression {
-	$$ = new SymbolInfo($1->getName() + "=" + $3->getName(), "expression");
-	printLog("expression : variable ASSIGNOP logic_expression", $$->getName());
+	if($1->getDataType() == $3->getDataType()) {
+		$$ = new SymbolInfo($1->getName() + "=" + $3->getName(), "expression");
+		printLog("expression : variable ASSIGNOP logic_expression", $$->getName());	
+	} else {
+		printError("Type Mismatch");
+	}
 }
 	   ;
 
 logic_expression : rel_expression {printLog("logic_expression : rel_expression", $1->getName());}
 		 | rel_expression LOGICOP rel_expression {
-	$$ = new SymbolInfo($1->getName() + $2->getName() + $3->getName(), "logic_expression");
+	$$ = new SymbolInfo($1->getName() + $2->getName() + $3->getName(), "logic_expression", "int");
 	printLog("logic_expression : rel_expression LOGICOP rel_expression", $$->getName());
 }
 		 ;
 
 rel_expression : simple_expression {printLog("rel_expression : simple_expression", $1->getName());}
 		| simple_expression RELOP simple_expression {
-	$$ = new SymbolInfo($1->getName() + $2->getName() + $3->getName(), "rel_expression");
+	$$ = new SymbolInfo($1->getName() + $2->getName() + $3->getName(), "rel_expression", "int");
 	printLog("rel_expression : simple_expression RELOP simple_expression", $$->getName());
 }
 		;
 
 simple_expression : term {printLog("simple_expression : term", $1->getName());}
 		  | simple_expression ADDOP term {
-	$$ = new SymbolInfo($1->getName() + $2->getName() + $3->getName(), "simple_expression");
+	string type = "int";
+    if($1->getDataType() == "float" || $2->getDataType() != "float") type = "float";
+	$$ = new SymbolInfo($1->getName() + $2->getName() + $3->getName(), "simple_expression", type);
 	printLog("simple_expression : simple_expression ADDOP term", $$->getName());
 }
 		  ;
 
 term :	unary_expression {printLog("term : unary_expression", $1->getName());}
      |  term MULOP unary_expression {
-	$$ = new SymbolInfo($1->getName() + $2->getName() + $3->getName(), "term");
-	printLog("term : term MULOP unary_expression", $$->getName());
+    string type1 = $1->getDataType();
+    string op = $2->getName();
+    string type2 = $3->getDataType(); 
+    if(op == "%" && (type1 != "int" || type2 != "int")) {
+    	printError("Integer operand on modulus operator");
+    } else {
+    	string type = "int";
+    	if(type1 == "float" || type2 == "float") type = "float";
+		$$ = new SymbolInfo($1->getName() + $2->getName() + $3->getName(), "term", type);
+		printLog("term : term MULOP unary_expression", $$->getName());
+    }
 }
      ;
 
 unary_expression : ADDOP unary_expression {
-	$$ = new SymbolInfo($1->getName() + $2->getName(), "unary_expression");
+	$$ = new SymbolInfo($1->getName() + $2->getName(), "unary_expression", $2->getDataType());
 	printLog("unary_expression : ADDOP unary_expression", $$->getName());
 }
 		 | NOT unary_expression {
-	$$ = new SymbolInfo("!" + $2->getName(), "unary_expression");
+	$$ = new SymbolInfo("!" + $2->getName(), "unary_expression", $2->getDataType());
 	printLog("unary_expression : NOT unary_expression", $$->getName());
 }
 		 | factor {printLog("unary_expression : factor", $1->getName());}
@@ -353,21 +426,28 @@ unary_expression : ADDOP unary_expression {
 	
 factor : variable {printLog("factor : variable", $1->getName());}
 	| ID LPAREN argument_list RPAREN {
-	$$ = new SymbolInfo($1->getName() + "(" + $3->getName() + ")", "factor");
-	printLog("factor : ID LPAREN argument_list RPAREN", $$->getName());
+	string name = $1->getName();
+	SymbolInfo* temp = st.lookUp(name);
+	if(temp == NULL) {
+		printError("Undeclared Function: " + name);
+	} else {
+		verifyFunctionCall(temp);
+		$$ = new SymbolInfo(name + "(" + $3->getName() + ")", "factor", $1->getDataType());
+		printLog("factor : ID LPAREN argument_list RPAREN", $$->getName());
+	}
 }
 	| LPAREN expression RPAREN {
-	$$ = new SymbolInfo("(" + $2->getName() + ")", "factor");
+	$$ = new SymbolInfo("(" + $2->getName() + ")", "factor", $2->getDataType());
 	printLog("factor : LPAREN expression RPAREN", $$->getName());
 }
 	| CONST_INT {printLog("factor : CONST_INT", $1->getName());}
 	| CONST_FLOAT {printLog("factor : CONST_FLOAT", $1->getName());}
 	| variable INCOP {
-	$$ = new SymbolInfo($1->getName() + "++", "factor");
+	$$ = new SymbolInfo($1->getName() + "++", "factor", $1->getDataType());
 	printLog("factor : variable INCOP", $$->getName());
 }
 	| variable DECOP {
-	$$ = new SymbolInfo($1->getName() + "--", "factor");
+	$$ = new SymbolInfo($1->getName() + "--", "factor", $1->getDataType());
 	printLog("factor : variable DECOP", $$->getName());
 }
 	;
@@ -379,10 +459,14 @@ argument_list : arguments {printLog("argument_list : arguments", $1->getName());
 			  ;
 	
 arguments : arguments COMMA logic_expression {
+	argumentTypes.push_back($3->getDataType());
 	$$ = new SymbolInfo($1->getName() + ", " + $3->getName(), "arguments");
 	printLog("arguments : arguments COMMA logic_expression", $$->getName());
 }
-	      | logic_expression {printLog("arguments : logic_expression", $1->getName());}
+	      | logic_expression {
+	      argumentTypes.push_back($1->getDataType());
+	      printLog("arguments : logic_expression", $1->getName());
+}
 	      ;
  
 
