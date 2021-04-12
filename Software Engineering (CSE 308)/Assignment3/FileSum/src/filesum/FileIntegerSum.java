@@ -1,9 +1,11 @@
+package filesum;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.Scanner;
 
-class FileIntegerSum {
-    int calculateSum(String fileName) {
+public class FileIntegerSum {
+    public int calculateSum(String fileName) {
         Scanner scanner;
         try {
             scanner = new Scanner(new File(fileName));
