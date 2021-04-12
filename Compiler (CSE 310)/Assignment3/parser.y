@@ -10,9 +10,13 @@ int yylex(void);
 
 FILE* fp;
 ofstream log_;
+ofstream error;
+bool hasScopeStarted;
+vector<pair<string, bool>> declaration_list; // bool value  determines if its an array
 
 extern FILE* yyin;
 extern int line_count;
+extern int error_count;
 extern SymbolTable st;
 
 
@@ -23,6 +27,82 @@ void yyerror(char *s)
 
 void printLog(string grammar, string sentence) {
 	log_ << "At line no: " << line_count << " " << grammar << "\n\n" << sentence << "\n\n";
+}
+
+void printError(string message) {
+	error << "Error At Line " << line_count << ": " << message << "\n\n";
+}
+
+vector<string> getParamTypes(string s) {
+	replace(s.begin(), s.end(), ',', ' ');
+	istringstream ss(s);
+	vector<string> paramTypes;
+    string token;
+    while (ss >> token) {
+    	if(token == "void") { //int f(void) ??
+    		printError("Void data-type for params");
+    		break;
+    	}
+    	if(token == "int" || token == "float") {
+			paramTypes.push_back(token);
+    	}
+    }
+    return paramTypes;
+}
+
+void insertParamsInSymbolTable(string s) {
+	replace(s.begin(), s.end(), ',', ' ');
+	
+	//tokenize
+	istringstream ss(s);
+    string token;
+    string currentDataType;
+    while (ss >> token) {
+    	if(token == "void") {
+    		printError("Void data-type for params");
+    		break;
+    	}  	
+    	if(token == "int" || token == "float") {
+			currentDataType = token;
+    	} else {
+    		st.insert(new SymbolInfo(token, "ID", currentDataType));
+    	}
+    }
+}
+
+void insertVarsInSymbolTable(string dataType) {
+	if(dataType == "void") {
+   		printError("Void data-type for variables");
+   		return;
+    }
+	string arrayDataType = dataType + "_array";
+	string dtype;
+	for(pair<string, bool> x : declaration_list) {
+		if(x.second) dtype = arrayDataType;
+		else dtype = dataType;
+		if(!st.insert(new SymbolInfo(x.first, "ID", dtype))) {
+			printError("Multiple Declaration of " + x.first);
+		}
+	}
+	declaration_list.clear();
+}
+
+bool verifyWithDeclaration(string returnType, string name, vector<string> paramTypes = {}) {
+	SymbolInfo* funcInfo = st.lookUp(name);
+	if(funcInfo != NULL) {
+		if(returnType != funcInfo->getDataType()) return 0;
+		
+		vector<string> declaredParamTypes = funcInfo->getParamTypes();
+		if(paramTypes.size() != declaredParamTypes.size()) return 0;
+		
+		for(int i=0; i<paramTypes.size(); i++) 
+			if(paramTypes[i] != declaredParamTypes[i]) return 0;
+			
+		return 1;
+		
+	} else {
+		return 1;
+	}
 }
 
 
@@ -39,8 +119,7 @@ void printLog(string grammar, string sentence) {
 %%
 
 start : program {
-	$$ = new SymbolInfo($1->getName(), "program");
-	printLog("start : program", $$->getName());
+	st.printAllScopeTables(log_);
 }
 	;
 
@@ -60,26 +139,51 @@ unit : var_declaration {printLog("unit : var_declaration", $1->getName());}
      ;
      
 func_declaration : type_specifier ID LPAREN parameter_list RPAREN SEMICOLON {
-	st.insert($2->getName(), "ID");
+	st.insert( new SymbolInfo($2->getName(), "ID", $1->getName(), getParamTypes($4->getName())) );
 	$$ = new SymbolInfo($1->getName() + " " + $2->getName() + "(" + $4->getName() + ");", "func_declaration");
 	printLog("func_declaration : type_specifier ID LPAREN parameter_list RPAREN SEMICOLON", $$->getName());
 }
 		| type_specifier ID LPAREN RPAREN SEMICOLON {
-	st.insert($2->getName(), "ID");
+	st.insert( new SymbolInfo($2->getName(), "ID", $1->getName()) );
 	$$ = new SymbolInfo($1->getName() + " " + $2->getName() + "();", "func_declaration");
 	printLog("func_declaration : type_specifier ID LPAREN RPAREN SEMICOLON", $$->getName());
 }
 		;
 		 
-func_definition : type_specifier ID LPAREN parameter_list RPAREN compound_statement {
-	st.insert($2->getName(), "ID");
-	$$ = new SymbolInfo($1->getName() + " " + $2->getName() + "(" + $4->getName() + ")" + $6->getName(), "func_definition");
+func_definition : type_specifier ID LPAREN parameter_list RPAREN {
+	vector<string> paramTypes = getParamTypes($4->getName());
+	
+	SymbolInfo* funcInfo = st.lookUp($2->getName());
+	if(funcInfo == NULL) {
+		st.insert( new SymbolInfo($2->getName(), "ID", $1->getName(), paramTypes) );
+	} else {
+		if(!verifyWithDeclaration($1->getName(), $2->getName(), paramTypes)) {
+			printError("Function Declaration MisMatch");
+		} 
+	}
+	
+	st.enterScope();
+	insertParamsInSymbolTable($4->getName());
+	hasScopeStarted = 1;
+} compound_statement {
+	$$ = new SymbolInfo($1->getName() + " " + $2->getName() + "(" + $4->getName() + ")" + $7->getName(), "func_definition");
 	st.exitScope();
 	printLog("func_definition : type_specifier ID LPAREN parameter_list RPAREN compound_statement", $$->getName());
 }
-		| type_specifier ID LPAREN RPAREN compound_statement {
-	st.insert($2->getName(), "ID");
-	$$ = new SymbolInfo($1->getName() + " " + $2->getName() + "()" + $5->getName(), "func_definition");
+		| type_specifier ID LPAREN RPAREN {	
+	SymbolInfo* funcInfo = st.lookUp($2->getName());
+	if(funcInfo != NULL) {
+		st.insert( new SymbolInfo($2->getName(), "ID", $1->getName()) );
+	} else {
+		if(!verifyWithDeclaration($1->getName(), $2->getName())) {
+			printError("Function Declaration MisMatch");
+		} 
+	}
+	
+	st.enterScope();
+	hasScopeStarted = 1;	
+} compound_statement {
+	$$ = new SymbolInfo($1->getName() + " " + $2->getName() + "()" + $6->getName(), "func_definition");
 	st.exitScope();
 	printLog("func_definition : type_specifier ID LPAREN RPAREN compound_statement", $$->getName());
 }
@@ -87,16 +191,14 @@ func_definition : type_specifier ID LPAREN parameter_list RPAREN compound_statem
 
 
 parameter_list : parameter_list COMMA type_specifier ID {
-	st.insert($4->getName(), "ID");
-	$$ = new SymbolInfo($1->getName() + ", " + $3->getName() + " " + $4->getName(), "parameter_list");
+	$$ = new SymbolInfo($1->getName() + "," + $3->getName() + " " + $4->getName(), "parameter_list");
 	printLog("parameter_list : parameter_list COMMA type_specifier ID", $$->getName());
 }
-		| parameter_list COMMA type_specifier {
-	$$ = new SymbolInfo($1->getName() + ", " + $3->getName(), "parameter_list");
+		| parameter_list COMMA type_specifier { //this is valid for func declaration, not definition. gotta solve?
+	$$ = new SymbolInfo($1->getName() + "," + $3->getName(), "parameter_list");
 	printLog("parameter_list : parameter_list COMMA type_specifier", $$->getName());
 }
  		| type_specifier ID {
- 	st.insert($2->getName(), "ID");
 	$$ = new SymbolInfo($1->getName() + " " + $2->getName(), "parameter_list");
 	printLog("parameter_list : type_specifier ID", $$->getName());
 }
@@ -104,17 +206,24 @@ parameter_list : parameter_list COMMA type_specifier ID {
  		;
 
  		
-compound_statement : LCURL statements RCURL {
-	$$ = new SymbolInfo("{\n" + $2->getName() + "\n}", "compound_statement");
+compound_statement : LCURL {
+	if(hasScopeStarted) hasScopeStarted = 0;
+	else st.enterScope();
+} statements RCURL {
+	$$ = new SymbolInfo("{\n" + $3->getName() + "\n}", "compound_statement");
 	printLog("compound_statement : LCURL statements RCURL", $$->getName());
 }
- 		    | LCURL RCURL {
+ 		    | LCURL {
+	if(hasScopeStarted) hasScopeStarted = 0;
+	else st.enterScope();
+} RCURL {
  	$$ = new SymbolInfo("{}", "compound_statement");
 	printLog("compound_statement : LCURL RCURL", $$->getName());
 }
  		    ;
  		    
 var_declaration : type_specifier declaration_list SEMICOLON {
+	insertVarsInSymbolTable($1->getName());
 	$$ = new SymbolInfo($1->getName() + " " + $2->getName() + ";", "var_declaration");
 	printLog("var_declaration : type_specifier declaration_list SEMICOLON", $$->getName());
 }
@@ -126,21 +235,21 @@ type_specifier : INT {printLog("type_specifier : INT", $1->getName());}
  		;
  		
 declaration_list : declaration_list COMMA ID {
-	st.insert($3->getName(), "ID");
+	declaration_list.push_back({$3->getName(), 0});
 	$$ = new SymbolInfo($1->getName() + "," + $3->getName(), "declaration_list");
 	printLog("declaration_list : declaration_list COMMA ID", $$->getName());
 }
  		  | declaration_list COMMA ID LTHIRD CONST_INT RTHIRD {
- 	st.insert($3->getName(), "ID");
+ 	declaration_list.push_back({$3->getName(), 1});
 	$$ = new SymbolInfo($1->getName() + "," + $3->getName() + "[" + $5->getName() + "]", "declaration_list");
 	printLog("declaration_list : declaration_list COMMA ID LTHIRD CONST_INT RTHIRD", $$->getName());
 }
  		  | ID {
- 	st.insert($1->getName(), "ID");
+ 	declaration_list.push_back({$1->getName(), 0});
  	printLog("declaration_list : ID", $1->getName());
  }
  		  | ID LTHIRD CONST_INT RTHIRD {
- 	st.insert($1->getName(), "ID");
+ 	declaration_list.push_back({$1->getName(), 1});
 	$$ = new SymbolInfo($1->getName() + "[" + $3->getName() + "]", "declaration_list");
 	printLog("declaration_list : ID LTHIRD CONST_INT RTHIRD", $$->getName());
 }
@@ -264,7 +373,9 @@ factor : variable {printLog("factor : variable", $1->getName());}
 	;
 	
 argument_list : arguments {printLog("argument_list : arguments", $1->getName());}
-			  |
+			  | { $$ = new SymbolInfo("", "argument_list");
+		 		printLog("argument_list : ", $$->getName());
+			  }
 			  ;
 	
 arguments : arguments COMMA logic_expression {
@@ -293,15 +404,23 @@ int main(int argc,char *argv[])
 	fp2= fopen(argv[2],"a");
 	fp3= fopen(argv[3],"a");*/
 	log_.open("log.txt");
+	error.open("error.txt");
 	
 	line_count = 1;
+	error_count = 0;
+	hasScopeStarted = 0;
 	yyin=fp;
 	yyparse();
 	
-
+	fseek(yyin, -1, SEEK_END);
+	if(fgetc(yyin) == '\n') line_count --;
+	log_ << "Total Lines: " << line_count << "\n";
+	log_ << "Total Errors: " << error_count;
 	//fclose(fp2);
 	//fclose(fp3);
+	fclose(yyin);
 	log_.close();
+	error.close();
 	
 	return 0;
 }

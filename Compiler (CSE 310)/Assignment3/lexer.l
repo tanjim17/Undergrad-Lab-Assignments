@@ -175,7 +175,7 @@ FLOAT ({DIGIT}+|({DIGIT}*\.{DIGIT}*))(E[\+\-]?{DIGIT}+)?
 	return RPAREN;
 }
 "{" {
-	st.enterScope();
+	//st.enterScope();
 	printTokenAndLog("LCURL");
 	yylval.x = new SymbolInfo(yytext, "LCURL");
 	return LCURL;	

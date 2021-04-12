@@ -6,12 +6,16 @@ extern ofstream log_;
 class SymbolInfo {
     string name;
     string type;
+    string dataType;
     SymbolInfo* next;
+    vector<string> paramTypes;
 
 public:
-    SymbolInfo(string name, string type) {
+    SymbolInfo(string name, string type, string dataType = "", vector<string> paramTypes = {}) {
         this->name = name;
         this->type = type;
+        this->dataType = dataType;
+        this->paramTypes = paramTypes;
         next = NULL;
     }
     void setName(string name) {this->name = name;}
@@ -19,6 +23,8 @@ public:
     void setNext(SymbolInfo* next) {this->next = next;}
     string getName() {return name;}
     string getType() {return type;}
+    string getDataType() {return dataType;}
+    vector<string> getParamTypes() {return paramTypes;}
     SymbolInfo* getNext() {return next;}
 };
 
@@ -52,11 +58,12 @@ public:
         lastChildId = 0;
     }
 
-    bool insert(string name, string type) {
+    bool insert(SymbolInfo* symbolInfo) {
+    	string name = symbolInfo->getName();
         int bucketNo = hash_(name, numOfBuckets);
         SymbolInfo* current = buckets[bucketNo];
         if(current == NULL) {
-            buckets[bucketNo] = new SymbolInfo(name, type);
+            buckets[bucketNo] = symbolInfo;
             tokenCount[bucketNo] ++;
             return true;
         }
@@ -73,7 +80,7 @@ public:
             current = current->getNext();
             index ++;
         }
-        current->setNext(new SymbolInfo(name, type));
+        current->setNext(symbolInfo);
         tokenCount[bucketNo] ++;
         return true;
     }
@@ -183,8 +190,8 @@ public:
         currentScopeTable = temp;
     }
 
-    bool insert(string name, string type) {
-        return currentScopeTable->insert(name, type);
+    bool insert(SymbolInfo* symbolInfo) {
+        return currentScopeTable->insert(symbolInfo);
     }
 
     bool delete_(string name) {
