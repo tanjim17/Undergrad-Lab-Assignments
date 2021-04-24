@@ -19,7 +19,7 @@ int error_count;
 bool hasCommentEnded;
 bool hasWrongEscapeSeq;
 string comment;
-map<string, int> keyword_map = {{"if", IF}, {"else", ELSE}, {"for", FOR}, {"while", WHILE}, {"int", INT}, {"float", FLOAT}, {"void", VOID}, {"return", RETURN}};
+map<string, int> keyword_map = {{"if", IF}, {"else", ELSE}, {"for", FOR}, {"while", WHILE}, {"int", INT}, {"float", FLOAT}, {"void", VOID}, {"return", RETURN}, {"printf", PRINTLN}};
 //extern YYSTYPE yylval;
 
 string replaceWithEscapeSeq(string s) {
@@ -101,7 +101,7 @@ void handleScopeTable(string tokenName) {
 %}
 
 NEWLINE (\n|\r\n)
-KEYWORD (if|else|for|while|do|break|int|char|float|double|void|return|switch|case|default|continue)
+KEYWORD (if|else|for|while|do|break|int|char|float|double|void|return|switch|case|default|continue|printf)
 WHITESPACE [ \t\f\r\v]+ 
 LETTER [a-zA-Z]
 DIGIT [0-9]
