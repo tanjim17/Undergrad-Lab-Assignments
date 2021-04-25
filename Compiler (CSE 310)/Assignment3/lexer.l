@@ -6,7 +6,6 @@
 #include<bits/stdc++.h>
 #include "SymbolTable.cpp"
 #include "y.tab.h"
-//#define YYSTYPE SymbolInfo*
 
 using namespace std;
 
@@ -20,7 +19,9 @@ bool hasCommentEnded;
 bool hasWrongEscapeSeq;
 string comment;
 map<string, int> keyword_map = {{"if", IF}, {"else", ELSE}, {"for", FOR}, {"while", WHILE}, {"int", INT}, {"float", FLOAT}, {"void", VOID}, {"return", RETURN}, {"printf", PRINTLN}};
-//extern YYSTYPE yylval;
+
+extern ofstream log_;
+extern ofstream error;
 
 string replaceWithEscapeSeq(string s) {
 	for(int i=0; i<s.size(); i++) {
@@ -79,20 +80,22 @@ string printToken(string tokenName, string tokenAttribute = yytext) {
 	return token;
 }
 
-/*void printLog(string tokenName, string token = "") {
+void printLexLog(string tokenName, string token = "") {
 	logout << "Line no " << line_count << ": Token <" + tokenName + "> Lexeme " << yytext << " found";
 	if(token != "")
 		logout << " --> " << token;
 	logout << "\n\n";
-}*/
+}
 
 void printTokenAndLog(string tokenName) {
 	printToken(tokenName);
-	//printLog(tokenName);
+	printLexLog(tokenName);
 }
 
 void handleError(string message, string lexeme = yytext) {
-	logout << "Error at line no " << line_count << ": " << message << " " << lexeme << "\n\n";
+	string fullMessage = "Error at line " + to_string(line_count) + ": " + message + " " + lexeme + "\n\n";
+	error << fullMessage;
+	log_ << fullMessage;
 	error_count ++;
 }
 
@@ -119,7 +122,7 @@ FLOAT ({DIGIT}+|({DIGIT}*\.{DIGIT}*))(E[\+\-]?{DIGIT}+)?
 	string tokenName = yytext;
 	transform(tokenName.begin(), tokenName.end(), tokenName.begin(), ::toupper);
 	printKeywordToken(tokenName);
-	//printLog(tokenName);
+	printLexLog(tokenName);
 	yylval.x = new SymbolInfo(yytext, tokenName);
 	return keyword_map[yytext];
 }
@@ -236,7 +239,7 @@ FLOAT ({DIGIT}+|({DIGIT}*\.{DIGIT}*))(E[\+\-]?{DIGIT}+)?
 	temp = replaceWithEscapeSeq(temp);
 	
 	string token = printToken("CONST_CHAR", temp);
-	//printLog("CONST_CHAR", token);
+	printLexLog("CONST_CHAR", token);
 	handleScopeTable("CONST_CHAR");
 }
 
@@ -253,13 +256,13 @@ FLOAT ({DIGIT}+|({DIGIT}*\.{DIGIT}*))(E[\+\-]?{DIGIT}+)?
 	}
 	else {
 		string token = printToken("STRING", temp);
-		//printLog("STRING", token);
+		printLexLog("STRING", token);
 	}
 	line_count += countNewLines(yytext);
 }
 
 (\/\/(.|(\\{NEWLINE}))*) { //single-line comment
-	//printLog("COMMENT");
+	printLexLog("COMMENT");
 	line_count += countNewLines(yytext);
 }
 
@@ -293,7 +296,7 @@ FLOAT ({DIGIT}+|({DIGIT}*\.{DIGIT}*))(E[\+\-]?{DIGIT}+)?
 
 <COMMENT_STATE>\*\/ {
 	hasCommentEnded = 1;
-	//printLog("COMMENT");
+	printLexLog("COMMENT");
 	line_count += countNewLines(yytext);
 	BEGIN INITIAL;
 }

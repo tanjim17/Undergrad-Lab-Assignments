@@ -20,18 +20,19 @@ extern int line_count;
 extern int error_count;
 extern SymbolTable st;
 
+void handleError(string message) {
+	string fullMessage = "Error at line " + to_string(line_count) + ": " + message + "\n\n";
+	error << fullMessage;
+	log_ << fullMessage;
+	error_count ++;
+}
 
-void yyerror(char *s) {
-	printf("%s\n", s);
+void yyerror(string s) {
+	handleError(s);
 }
 
 void printLog(string grammar, string sentence) {
 	log_ << "Line " << line_count << ": " << grammar << "\n\n" << sentence << "\n\n";
-}
-
-void handleError(string message) {
-	error_count ++;
-	error << "Error at line " << line_count << ": " << message << "\n\n";
 }
 
 vector<string> stringSplit(string s) {
@@ -149,7 +150,7 @@ string determineType(string dType1, string dType2) {
 	if(dType1 == "void" || dType2 == "void") {
 		type = "void";
 	} else if(dType1 == "" || dType2 == "") {
-		type = "";
+		type = ""; // empty type means an error has already been reported
 	} else {
 		type = "int";
     	if(dType1 == "float" || dType2 == "float") type = "float";	
@@ -362,13 +363,9 @@ variable : ID {
 		handleError("Undeclared variable " + name);
 	} else {
 		if(temp->getIsFunction())
-			handleError(name + " is a function, not a variable"); // gotta write it in more places
+			handleError(name + " is a function, not a variable");
 		else {
 			dataType = temp->getDataType();
-		}
-		if (dataType.find("array") != string::npos) {
-			//dataType.substr(0, dataType.find("_"));
-			//handleError("Array without index");
 		}
 	}
 	$$ = new SymbolInfo(name, "variable", dataType);
@@ -405,7 +402,7 @@ expression : logic_expression {printLog("expression : logic_expression", $1->get
 	   | variable ASSIGNOP logic_expression {
 	string lhs_dataType = $1->getDataType();
 	string rhs_dataType = $3->getDataType();
-	cout << line_count << " " << lhs_dataType << " " << rhs_dataType << "\n";
+	//cout << line_count << " " << lhs_dataType << " " << rhs_dataType << "\n";
 	if(lhs_dataType == "void" || rhs_dataType == "void") {
 		handleError("Void function used in expression");
 	}
@@ -422,7 +419,7 @@ expression : logic_expression {printLog("expression : logic_expression", $1->get
 logic_expression : rel_expression {printLog("logic_expression : rel_expression", $1->getName());}
 		 | rel_expression LOGICOP rel_expression {
 	string type = "int";
-	if($1->getDataType() == "void" || $1->getDataType() == "void") {
+	if($1->getDataType() == "void" || $3->getDataType() == "void") {
 		handleError("Type Mismatch");
 		type = "";
 	}
@@ -434,7 +431,7 @@ logic_expression : rel_expression {printLog("logic_expression : rel_expression",
 rel_expression : simple_expression {printLog("rel_expression : simple_expression", $1->getName());}
 		| simple_expression RELOP simple_expression {
 	string type = "int";
-	if($1->getDataType() == "void" || $1->getDataType() == "void") {
+	if($1->getDataType() == "void" || $3->getDataType() == "void") {
 		handleError("Type Mismatch");
 		type = "";
 	}
@@ -529,7 +526,6 @@ arguments : arguments COMMA logic_expression {
 
 %%
 int main(int argc,char *argv[]) {
-	// PRINTLN, DECOP ei token gula baki
 	if((fp=fopen(argv[1],"r")) == NULL) {
 		printf("Cannot Open Input File.\n");
 		exit(1);
