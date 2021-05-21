@@ -1,6 +1,0 @@
-Line no 1: Token <STRING> Lexeme "\"" found --> <STRING, "> 
-
-ScopeTable # 1
-
-Total lines: 2
-Total errors: 0

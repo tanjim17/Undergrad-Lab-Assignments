@@ -4,7 +4,7 @@
 
 %{
 #include<bits/stdc++.h>
-#include "SymbolTable.cpp"
+#include "SymbolTable.h"
 using namespace std;
 
 ofstream logout;
@@ -234,8 +234,8 @@ int main(int argc,char *argv[]){
 		return 0;
 	}
 	
-	logout.open("1705032_log.txt");
-	tokenout.open("1705032_token.txt");
+	logout.open("log.txt");
+	tokenout.open("token.txt");
 	
 	yyin= fin;
 	line_count = 1;
