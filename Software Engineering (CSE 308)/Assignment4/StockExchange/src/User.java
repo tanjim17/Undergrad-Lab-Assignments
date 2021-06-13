@@ -1,17 +1,14 @@
-class User {
-    private boolean loginStatus;
+import java.io.PrintWriter;
 
-    User() {
-        loginStatus = false;
-    }
+class User {
+    private PrintWriter pw;
 
     void update(Stock stock, String property) {
-        if (loginStatus)
-            System.out.println(stock.getName() + " " + stock.getCount() + " " + stock.getValue()
+            pw.println(stock.getName() + " " + stock.getCount() + " " + stock.getValue()
                     + " (change in " + property + ")");
     }
 
-    void toggleLoginStatus() {
-        loginStatus = !loginStatus;
+    void setPrintWriter(PrintWriter pw) {
+        this.pw = pw;
     }
 }
