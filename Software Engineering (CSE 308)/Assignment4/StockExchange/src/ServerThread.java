@@ -2,22 +2,21 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 
-public class Server implements Runnable {
+public class ServerThread implements Runnable {
     private BufferedReader br;
     private PrintWriter pw;
     private User user;
-    private boolean loginStatus;
     private static ArrayList<Stock> stocks;
     private static ArrayList<User> users;
 
-    private Server(Socket socket) {
+    private ServerThread(Socket socket) {
         try {
             br = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             pw = new PrintWriter(socket.getOutputStream(), true);
         } catch (IOException e) {
             e.printStackTrace();
         }
-        loginStatus = false;
+        user = null;
     }
 
     public static void main(String[] args) {
@@ -38,13 +37,13 @@ public class Server implements Runnable {
             users.add(new User());
         }
 
-        new Thread(Server::updateStock,"update stock thread").start();
+        new Thread(ServerThread::updateStock,"update stock thread").start();
         try {
             ServerSocket ss = new ServerSocket(1000);
             while (true) {
                 Socket s = ss.accept();
                 System.out.println("connected.");
-                new Thread(new Server(s)).start();
+                new Thread(new ServerThread(s)).start();
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -98,12 +97,11 @@ public class Server implements Runnable {
         switch (tokens[0]) {
             case "L":
                 user = users.get(Integer.parseInt(tokens[1]));
-                loginStatus = true;
-                user.setPrintWriter(pw);
+                user.setServerThread(this);
                 printStocks();
                 break;
             case "S":
-                if (loginStatus) {
+                if (user != null) {
                     stock = searchStock(tokens[1]);
                     if (stock != null) {
                         stock.subscribe(user);
@@ -111,7 +109,7 @@ public class Server implements Runnable {
                 }
                 break;
             case "U":
-                if (loginStatus) {
+                if (user != null) {
                     stock = searchStock(tokens[1]);
                     if (stock != null) {
                         stock.unsubscribe(user);
@@ -134,5 +132,9 @@ public class Server implements Runnable {
         for (Stock stock : stocks) {
             pw.println(stock.getName() + " " + stock.getCount() + " " + stock.getValue());
         }
+    }
+
+    PrintWriter getPrintWriter() {
+        return pw;
     }
 }

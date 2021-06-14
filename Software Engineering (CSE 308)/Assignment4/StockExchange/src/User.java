@@ -1,14 +1,12 @@
-import java.io.PrintWriter;
-
 class User {
-    private PrintWriter pw;
+    private ServerThread serverThread;
 
     void update(Stock stock, String property) {
-            pw.println(stock.getName() + " " + stock.getCount() + " " + stock.getValue()
+            serverThread.getPrintWriter().println(stock.getName() + " " + stock.getCount() + " " + stock.getValue()
                     + " (change in " + property + ")");
     }
 
-    void setPrintWriter(PrintWriter pw) {
-        this.pw = pw;
+    void setServerThread(ServerThread serverThread) {
+        this.serverThread = serverThread;
     }
 }

@@ -4,27 +4,27 @@ class Stock {
     private String name;
     private int count;
     private float value;
-    private ArrayList<User> users;
+    private ArrayList<User> subscribers;
 
     Stock(String name, int count, float value) {
         this.name = name;
         this.count = count;
         this.value = value;
-        users = new ArrayList<>();
+        subscribers = new ArrayList<>();
     }
 
     private void notifyUsers(String property) {
-        for (User user : users) {
-            user.update(this, property);
+        for (User subscriber : subscribers) {
+            subscriber.update(this, property);
         }
     }
 
     void subscribe(User user) {
-        users.add(user);
+        subscribers.add(user);
     }
 
     void unsubscribe(User user) {
-        users.remove(user);
+        subscribers.remove(user);
     }
 
     String getName() {
