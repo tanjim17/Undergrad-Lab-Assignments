@@ -19,6 +19,10 @@ vector<string> undefinedFunctions;
 //these variables are for code generation
 vector<string> variables;
 vector<string> arrays;
+int labelCount = 0;
+int tempCount = 0;
+string currentFunc;
+vector<SymbolInfo*> argumentSymbolInfos;
 //
 
 extern FILE* yyin;
@@ -72,15 +76,22 @@ vector<vector<string>> extractParamInfos(string s) {
     return extractedParamInfos;
 }
 
-void insertParams(vector<string> paramNames) {
+void insertParams(vector<string> paramNames, SymbolInfo* funcInfo) {
     string currentDataType;
-    for(string paramName: paramNames) { 	
-    	if( !st.insert(new SymbolInfo(param_info, "ID", currentDataType)) ) {
-    			handleError("Multiple declaration of " + param_info + " in parameter");
+    string asmName;
+    vector<string> paramAsmNames;
+    for(string paramName: paramNames) {
+    	SymbolInfo* symbolInfo = new SymbolInfo(paramName, "ID", currentDataType);
+    	asmName = paramName + st.getCurrentScopeId();
+    	paramAsmNames.push_back(asmName);
+    	symbolInfo->setAsmName(asmName);
+    	if(!st.insert(symbolInfo)) {
+    			handleError("Multiple declaration of " + paramName + " in parameter");
     	} else {
-    		variables.push_back(param_info + st.getCurrentScopeId());
+    		variables.push_back(asmName);
     	}
 	}
+	funcInfo->setParamAsmNames(paramAsmNames);
 }
 
 void insertVars(string dataType) {
@@ -89,14 +100,18 @@ void insertVars(string dataType) {
     }
 	string arrayDataType = dataType + "_array";
 	string dtype;
+	string asmName;
 	for(pair<string, int> x : declaration_list) {
 		if(x.second != "0") dtype = arrayDataType;
 		else dtype = dataType;
-		if(!st.insert(new SymbolInfo(x.first, "ID", dtype))) {
+		SymbolInfo* symbolInfo = new SymbolInfo(x.first, "ID", dtype);
+		asmName = x.first + st.getCurrentScopeId();
+    	symbolInfo->setAsmName(asmName);
+		if(!st.insert(symbolInfo)) {
 			handleError("Multiple declaration of " + x.first);
 		} else {
-			if(x.second != "0") arrays.push_back(x.first + st.getCurrentScopeId(), x.second);
-			else variables.push_back(x.first + st.getCurrentScopeId());
+			if(x.second != "0") arrays.push_back(asmName, x.second);
+			else variables.push_back(asmName);
 		}
 	}
 	declaration_list.clear();
@@ -121,7 +136,9 @@ void verifyWithDeclaration(string returnType, SymbolInfo* funcInfo, vector<strin
 void checkAndInsertFunc(string returnType, string name, vector<string> paramTypes = {}) {
 	SymbolInfo* funcInfo = st.lookUp(name);
 	if(funcInfo == NULL) {
-		st.insert( new SymbolInfo(name, "ID", returnType, 1, paramTypes) );
+		SymbolInfo* funcInfo = new SymbolInfo(name, "ID", returnType, 1);
+		funcInfo->setParamTypes(paramTypes);
+		st.insert(funcInfo);
 	} else {
 		if (find(undefinedFunctions.begin(), undefinedFunctions.end(), name) != undefinedFunctions.end()) {
 			undefinedFunctions.erase(remove(undefinedFunctions.begin(), undefinedFunctions.end(), name), undefinedFunctions.end());
@@ -167,6 +184,16 @@ string determineType(string dType1, string dType2) {
     	if(dType1 == "float" || dType2 == "float") type = "float";	
 	}
 	return type;
+}
+
+string newLabel() {
+	return "Label_" + to_string(labelCount++);
+}
+
+string newTemp() {
+	string temp = "temp_" + to_string(tempCount++);
+    variables.push_back(temp);
+	return temp;
 }
 
 %}
@@ -253,9 +280,9 @@ func_definition : type_specifier ID LPAREN parameter_list RPAREN {
 	vector<vector<string>> extractedParamInfos = extractedParamInfos($4->getName());
 	vector<string> paramNames = extractedParamInfos[0];
 	vector<string> paramTypes = extractedParamInfos[1];
-	checkAndInsertFunc($1->getName(), $2->getName(), paramTypes);
+	SymbolInfo* funcInfo = checkAndInsertFunc($1->getName(), $2->getName(), paramTypes);
 	st.enterScope();
-	insertParams(paramNames);
+	insertParams(paramNames, funcInfo);
 	variables.push_back($2->getName() + "ReturnVar");
 	hasScopeStarted = 1;
 } compound_statement {
@@ -275,6 +302,7 @@ func_definition : type_specifier ID LPAREN parameter_list RPAREN {
 		code += "POP DX\nPOP CX\nPOP BX\nPOP AX\nret\n"; 
 		$$->setCode(code + $2->getName() + " ENDP\n");
 	}
+	currentFunc = $2->getName();
 	st.exitScope();
 	printLog("func_definition : type_specifier ID LPAREN parameter_list RPAREN compound_statement", $$->getName());
 }
@@ -294,6 +322,7 @@ func_definition : type_specifier ID LPAREN parameter_list RPAREN {
 		code += "POP DX\nPOP CX\nPOP BX\nPOP AX\nret\n"; 
 		$$->setCode(code + $2->getName() + " ENDP\n");
 	}
+	currentFunc = $2->getName();
 	st.exitScope();
 	printLog("func_definition : type_specifier ID LPAREN RPAREN compound_statement", $$->getName());
 }
@@ -380,18 +409,70 @@ statement : var_declaration {printLog("statement : var_declaration", $1->getName
 	  | FOR LPAREN expression_statement expression_statement expression RPAREN statement {
 	$$ = new SymbolInfo("for(" + $3->getName() + $4->getName() + $5->getName() + ")" + $7->getName(), "statement");
 	printLog("statement : FOR LPAREN expression_statement expression_statement expression RPAREN statement", $$->getName());
+		string code = $3->getCode();
+		string label1 = newLabel();
+		string label2 = newLabel();
+		code += ";Loop Begin\n";
+		code += label1 + ":\n";
+		code += ";$4 code Begin\n";
+		code += $4->getCode();
+		code += ";$4 code End\n";
+
+		code += "MOV AX," + $4->getAsmName() + "\n"; // ?
+		code += "CMP AX,0\n";
+		code += "JE " + label2 + "\n";
+		code += ";$7 code Begin\n";
+		code += $7->getCode();
+		code += ";$5 code Begin\n";
+		code += $5->getCode();
+		code += "JMP " + label1 + "\n";
+		code += label2 + ":\n";
+		code += ";Loop END\n";
+		$$->setCode(code);
 }
 	  | IF LPAREN expression RPAREN statement %prec LOWER_THAN_ELSE {
 	$$ = new SymbolInfo("if(" +  $3->getName() + ")" + $5->getName(), "statement");
 	printLog("statement : IF LPAREN expression RPAREN statement", $$->getName());
+		string code = $3->getCode();
+		string label1 = newLabel();
+		code += "MOV AX," + $3->getAsmName() + "\n"; // ?
+		code += "CMP AX,0\n";
+		code += "JE " + label1 + "\n";
+		code += $5->getCode();
+		code += label1 + ":\n";
+		$$->setCode(code);
 }
 	  | IF LPAREN expression RPAREN statement ELSE statement {
 	$$ = new SymbolInfo("if(" +  $3->getName() + ")" + $5->getName() + " else " + $7->getName(), "statement");
 	printLog("statement : IF LPAREN expression RPAREN statement ELSE statement", $$->getName());
+	string code = $3->getCode();
+		string label1 = newLabel();
+		string label2 = newLabel();
+		code += "MOV AX," + $3->getAsmName() + "\n"; // ?
+		code += "CMP AX,0\n";
+		code += "JE " +label1 + "\n";
+		code += $5->getCode();
+		code += "JMP " + label2 + "\n";
+		code += label1 + ":\n";
+		code += $7->getCode();
+		code += label2 + ":\n";
+		 $$-> setCode(code);
 }
 	  | WHILE LPAREN expression RPAREN statement {
 	$$ = new SymbolInfo("while(" +  $3->getName() + ")" + $5->getName(), "statement");
 	printLog("statement : WHILE LPAREN expression RPAREN statement", $$->getName());
+	string code = "";
+		string label1 = newLabel();
+		string label2 = newLabel();
+		code += label1 + ":\n";
+		code += $3->getCode();
+		code += "MOV AX," + $3->getAsmName() + "\n"; // ?
+		code += "CMP AX,0\n";
+		code += "JE " + label2 + "\n";
+		code += $5->getCode();
+		code += "JMP " + label1 + "\n";
+		code += label2 + ":\n";
+		$$->setCode(code);
 }
 	  | PRINTLN LPAREN ID RPAREN SEMICOLON {
 	string name = $3->getName();
@@ -403,10 +484,19 @@ statement : var_declaration {printLog("statement : var_declaration", $1->getName
 	}
 	$$ = new SymbolInfo("printf(" +  name + ");", "statement");
 	printLog("statement : PRINTLN LPAREN ID RPAREN SEMICOLON", $$->getName());
+	SymbolInfo* symbolTableEntry = symbolTable.lookup($3->getName()); // ?
+	string code = "MOV AX," + symbolTableEntry->getAsmName(); // ?
+		 code += "\nCALL OUTDEC\n";
+		 $$->setCode(code);
 }
 	  | RETURN expression SEMICOLON {
 	$$ = new SymbolInfo("return " +  $2->getName() + ";", "statement");
 	printLog("statement : RETURN expression SEMICOLON", $$->getName());
+		string code = $2->getCode();
+		code += "MOV AX," + $2->getAsmName() + "\n"; // ?
+		code += "MOV " + currentFunc + "ReturnVariable, AX\n";
+		code += "JMP labelReturn" + currentFunc + "\n";
+		$$->setCode(code);
 }
 	  ;
 	  
@@ -414,6 +504,8 @@ expression_statement : SEMICOLON {printLog("expression_statement : SEMICOLON", $
 			| expression SEMICOLON {
 	$$ = new SymbolInfo($1->getName() + ";", "expression_statement");
 	printLog("expression_statement : expression SEMICOLON", $$->getName());
+	$$->setCode($1->getCode());
+		$$->setAsmName($1->getAsmName());
 }
 			;
 	  
@@ -431,7 +523,10 @@ variable : ID {
 		}
 	}
 	$$ = new SymbolInfo(name, "variable", dataType);
-	printLog("variable : ID", name);	
+	printLog("variable : ID", name);
+	string asmName = temp->getAsmName();
+	$$->setAsmName(asmName);
+	$$->setCode(""); // lagbe?
 }
 	 | ID LTHIRD expression RTHIRD {
 	string name = $1->getName();
@@ -455,12 +550,23 @@ variable : ID {
 			}
 		}	
 	}
+	string code = "";
+		code += $3->getCode() + "MOV BX," + $3->getAsmName() + "\nADD BX, BX\n";
+		$$->setAssemblyArrayMember(true); // ?
+		string asmName = temp->getAsmName();
+		$$->setCode(code);
+		$$->setAsmName(asmName);
+		$$->setIsArray(true);
 	$$ = new SymbolInfo(name + "[" + $3->getName() + "]", "variable", dataType);
 	printLog("variable : ID LTHIRD expression RTHIRD", $$->getName());
 }
 	 ;
 	 
-expression : logic_expression {printLog("expression : logic_expression", $1->getName());}
+expression : logic_expression {
+	printLog("expression : logic_expression", $1->getName());
+	$$->setCode($1->getCode());
+			$$->setAsmName($1->getAsmName());
+}
 	   | variable ASSIGNOP logic_expression {
 	string lhs_dataType = $1->getDataType();
 	string rhs_dataType = $3->getDataType();
@@ -472,13 +578,26 @@ expression : logic_expression {printLog("expression : logic_expression", $1->get
 		|| (lhs_dataType == "" || rhs_dataType == "")
 		|| (lhs_dataType == "float" && rhs_dataType == "int"))) {
 		handleError("Type Mismatch");
-	}	
+	}
+	string code = $1->getCode() + $3->getCode();
+		code += "MOV AX," + $3->getAsmName() + "\n";
+		if($1->isArray()) {
+			code += "MOV " + $1->getAsmName() + "[BX], AX\n";
+		} else {
+			code += "MOV " + $1->getAsmName() + ", AX\n";
+		}	
+		$$->setCode(code);
+		$$->setAsmName($1->getAsmName());
 	$$ = new SymbolInfo($1->getName() + "=" + $3->getName(), "expression");
 	printLog("expression : variable ASSIGNOP logic_expression", $$->getName());	
 }
 	   ;
 
-logic_expression : rel_expression {printLog("logic_expression : rel_expression", $1->getName());}
+logic_expression : rel_expression {
+	printLog("logic_expression : rel_expression", $1->getName());
+	$$->setCode($1->getCode());
+		 $$->setAsmName($1->getAsmName());
+}
 		 | rel_expression LOGICOP rel_expression {
 	string type = "int";
 	if($1->getDataType() == "void" || $3->getDataType() == "void") {
@@ -509,7 +628,11 @@ simple_expression : term {printLog("simple_expression : term", $1->getName());}
 }
 		  ;
 
-term :	unary_expression {printLog("term : unary_expression", $1->getName());}
+term :	unary_expression {
+	printLog("term : unary_expression", $1->getName());
+	$$->setCode($1->getCode());
+	$$->setAssemblyID($1->getAssemblyID());
+}
      |  term MULOP unary_expression {
     string type1 = $1->getDataType();
     string op = $2->getName();
@@ -524,21 +647,68 @@ term :	unary_expression {printLog("term : unary_expression", $1->getName());}
     }
     $$ = new SymbolInfo($1->getName() + $2->getName() + $3->getName(), "term", type);
 	printLog("term : term MULOP unary_expression", $$->getName());
+	
+	string code = $1->getCode() + $3->getCode();
+	string temp = generateNewTempVariable();
+	code+="MOV AX,"+$1->getAssemblyID()+"\n";
+	code+="MOV BX,"+$3->getAssemblyID()+"\n";
+	if(op == "%") {
+		code+="MOV DX, 0\n";
+		code+="DIV BX\n";
+		code+="MOV "+ temp + ", DX\n";		
+	} else {
+		if(op == "*") code += "MUL BX\n";;
+		else if(op == "/") code+="DIV BX\n";
+		code+="MOV "+temp+", AX\n";
+	}
+	$$->setCode(code);
+	$$->setAssemblyID(temp);
 }
      ;
 
 unary_expression : ADDOP unary_expression {
 	$$ = new SymbolInfo($1->getName() + $2->getName(), "unary_expression", $2->getDataType());
 	printLog("unary_expression : ADDOP unary_expression", $$->getName());
+	string code = $2->getCode();
+							if($1->getName() == "-") {
+								code+="MOV AX," + $2->getAssemblyID() + "\n";
+								code+="NEG AX\n";
+								code+="MOV " + $2->getAssemblyID() + ", AX\n";
+							} 
+							$$->setCode(code);
+							$$->setAssemblyID($2->getAssemblyID());
 }
 		 | NOT unary_expression {
 	$$ = new SymbolInfo("!" + $2->getName(), "unary_expression", $2->getDataType());
 	printLog("unary_expression : NOT unary_expression", $$->getName());
+	string code = $2->getCode();
+						code+="MOV AX, "+$2->getAssemblyID()+"\n";
+						code+="NOT AX\n";
+						code+="MOV "+$2->getAssemblyID()+", AX\n";
+						$$->setCode(code);
+						$$->setAssemblyID($2->getAssemblyID());
 }
-		 | factor {printLog("unary_expression : factor", $1->getName());}
+		 | factor {
+		 printLog("unary_expression : factor", $1->getName());
+		 $$->setCode($1->getCode());
+						$$->setAssemblyID($1->getAssemblyID());
+				}
 		 ;
 	
-factor : variable {printLog("factor : variable", $1->getName());}
+factor : variable {
+	printLog("factor : variable", $1->getName());
+	string code = $1->getCode();
+						if($1->getIsArray()) {
+							string temp = newTemp();
+							code += "MOV AX, " + $1->getAsmName() + "[BX]\n";
+							code += "MOV " + temp + ", AX\n";
+							$$->setAsmName(temp);
+						} else {
+							$$->setAsmName($1->getAsmName());
+						}
+
+						$$->setCode(code);
+}
 	| ID LPAREN argument_list RPAREN {
 	string name = $1->getName();
 	string dataType = "";
@@ -549,39 +719,107 @@ factor : variable {printLog("factor : variable", $1->getName());}
 		verifyFunctionCall(temp);
 		dataType = temp->getDataType();
 	}
+	string code = $3->getCode();	
+		vector<string> paramAsmNames = temp->getParamAsmNames();
+		reverse(paramAsmNames.begin(), paramAsmNames.end());
+		for(int i = 0 ; i < paramAsmNames.size(); i++) {
+			code += "MOV AX, " + argumentSymbolInfos[i]->getAsmName() + "\n";
+			code += "MOV " + paramAsmNames[i] + ", AX\n";
+
+		}
+		code += "CALL " + $1->getName() + "\n";
+		code += "MOV AX," + $1->getName() + "ReturnVariable\n";
+		string temp = newTemp();
+		code += "MOV " + temp + ", AX\n";
+		$$->setCode(code);
+		$$->setAsmName(temp);
+		argumentSymbolInfos.clear();
 	$$ = new SymbolInfo(name + "(" + $3->getName() + ")", "factor", dataType);
 	printLog("factor : ID LPAREN argument_list RPAREN", $$->getName());
 }
 	| LPAREN expression RPAREN {
 	$$ = new SymbolInfo("(" + $2->getName() + ")", "factor", $2->getDataType());
 	printLog("factor : LPAREN expression RPAREN", $$->getName());
+	$$->setCode($2->getCode());
+		 $$->setAsmName($2->getAsmName());
 }
-	| CONST_INT {printLog("factor : CONST_INT", $1->getName());}
-	| CONST_FLOAT {printLog("factor : CONST_FLOAT", $1->getName());}
+	| CONST_INT {
+	printLog("factor : CONST_INT", $1->getName());
+	string temp = newTemp();
+			string code = "MOV " + temp + "," + $1->getName() + "\n";
+			$$->setAsmName(temp);
+			$$->setCode(code);
+}
+	| CONST_FLOAT {
+	printLog("factor : CONST_FLOAT", $1->getName());
+	string temp = newTemp();
+			string code = "MOV " + temp + "," + $1->getName() + "\n";
+			$$->setAsmName(temp);
+			$$->setCode(code);
+}
 	| variable INCOP {
 	$$ = new SymbolInfo($1->getName() + "++", "factor", $1->getDataType());
 	printLog("factor : variable INCOP", $$->getName());
+	string temp = newTemp();
+			string code = "";
+			if($$->getIsArray()) {
+				code+="MOV AX,"+$1->getAsmName()+"[BX]\n";	
+				code+="MOV "+ temp +",AX\n";
+				code+="MOV AX,"+$1->getAsmName()+"[BX]\n";
+				code+="INC AX\n";
+				code+="MOV "+$1->getAsmName()+"[BX], AX\n";
+			} else {
+			code+="MOV AX,"+$1->getAsmName()+"\n";	
+			code+="MOV "+ temp +",AX\n";
+			code+="INC "+$1->getAsmName()+"\n";
+			}
+			$$->setCode(code);
+			$$->setAsmName(temp);
 }
 	| variable DECOP {
 	$$ = new SymbolInfo($1->getName() + "--", "factor", $1->getDataType());
 	printLog("factor : variable DECOP", $$->getName());
+	string temp = newTemp();
+			string code = "";
+			if($$->getIsArray()) {
+				code+="MOV AX,"+$1->getAsmName()+"[BX]\n";	
+				code+="MOV "+ temp +",AX\n";
+				code+="MOV AX,"+$1->getAsmName()+"[BX]\n";
+				code+="DEC AX\n";
+				code+="MOV "+$1->getAsmName()+"[BX], AX\n";
+			} else {
+			code+="MOV AX,"+$1->getAsmName()+"\n";	
+			code+="MOV "+ temp +",AX\n";
+			code+="DEC "+$1->getAsmName()+"\n";
+			}
+			$$->setCode(code);
+			$$->setAsmName(temp);
 }
 	;
 	
-argument_list : arguments {printLog("argument_list : arguments", $1->getName());}
-			  | { $$ = new SymbolInfo("", "argument_list");
-		 		printLog("argument_list : ", $$->getName());
-			  }
-			  ;
+argument_list : arguments {
+	printLog("argument_list : arguments", $1->getName());
+	$$->setCode($1->getCode());	
+}
+	| {
+	$$ = new SymbolInfo("", "argument_list");
+	printLog("argument_list : ", $$->getName());
+	//$$->setCode($1->getCode()); bhai dey nai, lagbe?
+}
+	;
 	
 arguments : arguments COMMA logic_expression {
 	argumentTypes.push_back($3->getDataType());
 	$$ = new SymbolInfo($1->getName() + "," + $3->getName(), "arguments");
 	printLog("arguments : arguments COMMA logic_expression", $$->getName());
+	argumentSymbolInfos.push_back($3);
+			$$->setCode($1->getCode() + $3->getCode());
 }
 	      | logic_expression {
 	      argumentTypes.push_back($1->getDataType());
 	      printLog("arguments : logic_expression", $1->getName());
+	      argumentSymbolInfos.push_back($1);
+		 	$$->setCode($1->getCode());
 }
 	      ;
  

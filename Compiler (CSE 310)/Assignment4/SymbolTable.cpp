@@ -4,22 +4,27 @@ using namespace std;
 extern ofstream log_;
 
 class SymbolInfo {
-    string name, type, dataType, code;
+    string name, type, dataType, code, asmName; //for functions, dataType refers to return type
     SymbolInfo* next;
-    vector<string> paramTypes;
+    vector<string> paramTypes, paramAsmNames;
     bool isFunction;
+    bool isArray; //only for code generation purpose 
 
 public:
-    SymbolInfo(string name, string type, string dataType = "", bool isFunction = 0, vector<string> paramTypes = {}) {
+    SymbolInfo(string name, string type, string dataType = "", bool isFunction = 0) {
         this->name = name;
         this->type = type;
         this->dataType = dataType;
         this->isFunction = isFunction;
-        this->paramTypes = paramTypes;
+        paramTypes = paramAsmNames = {};
         next = NULL;
+        code = asmName = "";
+        isArray = false;
     }
     void setName(string name) {this->name = name;}
     string getName() {return name;}
+    void setAsmName(string asmName) {this->asmName = asmName;}
+    string getAsmName() {return asmName;}
     void setType(string type) {this->type = type;}
     string getType() {return type;}
     void setCode(string code) {this->code = code;}
@@ -27,7 +32,11 @@ public:
     void setNext(SymbolInfo* next) {this->next = next;}
     string getDataType() {return dataType;} 
     bool getIsFunction() {return isFunction;}
+    void setIsArray(bool isArray) {this->isArray = isArray;}
+    bool getIsArray() {return isArray;}
+    void setParamTypes(vector<string> paramTypes) {this->paramTypes = paramTypes;}
     vector<string> getParamTypes() {return paramTypes;}
+    void setParamAsmNames(vector<string> paramAsmNames) {this->paramAsmNames = paramAsmNames;}
     SymbolInfo* getNext() {return next;}
 };
 
