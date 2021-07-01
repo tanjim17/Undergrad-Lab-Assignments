@@ -16,7 +16,6 @@ public:
         this->type = type;
         this->dataType = dataType;
         this->isFunction = isFunction;
-        paramTypes = paramAsmNames = {};
         next = NULL;
         code = asmName = "";
         isArray = false;
@@ -37,6 +36,7 @@ public:
     void setParamTypes(vector<string> paramTypes) {this->paramTypes = paramTypes;}
     vector<string> getParamTypes() {return paramTypes;}
     void setParamAsmNames(vector<string> paramAsmNames) {this->paramAsmNames = paramAsmNames;}
+    vector<string> getParamAsmNames() {return paramAsmNames;}
     SymbolInfo* getNext() {return next;}
 };
 
@@ -64,7 +64,7 @@ public:
             buckets[i] = NULL;
         this->parent = parent;
         if(parent != NULL)
-            this->id = parent->getId() + "." + to_string(id);
+            this->id = parent->getId() + "_" + to_string(id);
         else
             this->id = to_string(id);
         lastChildId = 0;

@@ -18,7 +18,7 @@ int error_count;
 bool hasCommentEnded;
 bool hasWrongEscapeSeq;
 string comment;
-map<string, int> keyword_map = {{"if", IF}, {"else", ELSE}, {"for", FOR}, {"while", WHILE}, {"int", INT}, {"float", FLOAT}, {"void", VOID}, {"return", RETURN}, {"printf", PRINTLN}};
+map<string, int> keyword_map = {{"if", IF}, {"else", ELSE}, {"for", FOR}, {"while", WHILE}, {"int", INT}, {"float", FLOAT}, {"void", VOID}, {"return", RETURN}, {"printf", PRINTLN}, {"println", PRINTLN}};
 
 extern ofstream log_;
 extern ofstream error;
@@ -104,7 +104,7 @@ void handleScopeTable(string tokenName) {
 %}
 
 NEWLINE (\n|\r\n)
-KEYWORD (if|else|for|while|do|break|int|char|float|double|void|return|switch|case|default|continue|printf)
+KEYWORD (if|else|for|while|do|break|int|char|float|double|void|return|switch|case|default|continue|printf|println)
 WHITESPACE [ \t\f\r\v]+ 
 LETTER [a-zA-Z]
 DIGIT [0-9]
