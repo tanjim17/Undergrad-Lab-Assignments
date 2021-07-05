@@ -54,6 +54,11 @@ vector<string> stringSplit(string s) {
     return words;
 }
 
+vector<string> tokenizeAsmInstruction(string s) {
+	replace(s.begin(), s.end(), ',', ' ');
+	return stringSplit(s);
+}
+
 vector<vector<string>> extractParamInfos(string s) {
 	replace(s.begin(), s.end(), ',', ' ');
 	vector<string> param_infos = stringSplit(s);
@@ -76,12 +81,15 @@ vector<vector<string>> extractParamInfos(string s) {
     return extractedParamInfos;
 }
 
-void insertParams(vector<string> paramNames, SymbolInfo* funcInfo) {
-    string currentDataType;
+void insertParams(vector<vector<string>> extractedParamInfos, SymbolInfo* funcInfo) {
+	string paramName;
+    string dataType;
     string asmName;
     vector<string> paramAsmNames;
-    for(string paramName: paramNames) {
-    	SymbolInfo* symbolInfo = new SymbolInfo(paramName, "ID", currentDataType);
+    for(int i = 0; i < extractedParamInfos[0].size(); i++) {
+    	paramName = extractedParamInfos[0][i];
+    	dataType = extractedParamInfos[1][i];
+    	SymbolInfo* symbolInfo = new SymbolInfo(paramName, "ID", dataType);
     	asmName = paramName + st.getCurrentScopeId();
     	paramAsmNames.push_back(asmName);
     	symbolInfo->setAsmName(asmName);
@@ -161,10 +169,12 @@ void verifyFunctionCall(SymbolInfo* funcInfo) {
 	for(int i=0; i<declaredParamTypes.size(); i++) {
 		cout << declaredParamTypes[i] << " ";
 	}*/
+	cout << argumentTypes.size() << " " << declaredParamTypes.size() << " yo\n";
 	if(argumentTypes.size() != declaredParamTypes.size()) {
 		handleError("Total number of arguments mismatch in function " + name);
 	} else {
 		for(int i=0; i<argumentTypes.size(); i++) {
+			cout << argumentTypes[i] << " " << declaredParamTypes[i] << " " << name << "\n";
 			if(argumentTypes[i] != declaredParamTypes[i]) {
 				handleError(to_string(i+1) + "th argument mismatch in function " + name); break;
 			} else {
@@ -196,6 +206,97 @@ string newTemp() {
 	string temp = "temp_" + to_string(tempCount++);
     variables.push_back(temp);
 	return temp;
+}
+
+/*static inline std::string trim_copy(std::string s) {
+    trim(s);
+    return s;
+}
+
+string findCmd(string line) {
+	int i = 0;
+	int len = line.size();
+	for(i = 0; line[i]!=' '; i++) {
+		if(i >= len) {
+			return "";
+		}
+	}
+	return line.substr(0,i);
+}
+
+
+string findDestArg(string line) {
+	int i=0;
+	int len = line.size();
+	for(i = 0; line[i]!=' '; i++) {
+		if(i >= len) {
+			return "";
+		}
+	}
+	i++;
+	int j = i + 1;
+	for( ; line[j] != ',' ; j++) {	
+		if(j >= line.size()) {
+			return "";
+		}
+	}
+	return trim_copy(line.substr(i, j-i));
+}
+
+
+string findSrcArg(string line) {
+	int len = line.size();
+	int i = 0;
+	for(i = 0; line[i]!= ','; i++) {
+		if(i >= len) {
+			return "";
+		}
+	}
+	i += 1;
+	return trim_copy(line.substr(i, len-i));
+}*/
+
+void peepholeOptimize() {
+	ifstream in("code.asm");
+	ofstream out("optimized_code.asm");
+
+	string prevLine = "";
+	while(1) {
+		getline(in, prevLine);	
+		if(!in) {
+			in.close();
+			out.close();
+			return;
+		}
+		if(prevLine != "") break;
+	}
+	out << prevLine << "\n";
+	
+	string currLine = "";
+	while(1) {
+		getline(in, currLine);	
+		if(!in) {
+			in.close();
+			out.close();
+			return;
+		}
+		if(currLine == "") continue;
+		// cout << "\nLine: " << currLine << endl;
+		// cout << "CMD: " << findCmd(currLine) << endl;
+		// cout << "Source Arg: " << findSrcArg(currLine) << endl;
+		// cout << "Dest Arg: " << findDestArg(currLine) << "\n\n";
+		vector<string> prevTokens = tokenizeAsmInstruction(prevLine);
+		vector<string> currTokens = tokenizeAsmInstruction(currLine);
+		if(prevTokens[0] == "MOV" && currTokens[0] == "MOV") {	
+			if(prevTokens[1] == currTokens[2] && prevTokens[2] == currTokens[1]) {
+				out << ";line deleted here (peephole optimization)\n";
+				continue;
+			}
+		}	
+		out << currLine << endl;
+		prevLine = currLine;
+	}
+	return;
 }
 
 %}
@@ -230,6 +331,7 @@ start : program {
     "START:\nXOR CX, CX\nMOV BX, 10\n" +
     "EXTRACT_DIGIT:\nXOR DX, DX\nDIV BX\nPUSH DX\nINC CX\nOR AX, AX\nJNE EXTRACT_DIGIT\n" +
     "MOV AH, 2\nPRINT:\nPOP DX\nADD DL, 30H\nINT 21H\nLOOP PRINT\n" +
+    "MOV DX, 13\nMOV AH, 2\nINT 21h\nMOV DX, 10\nMOV AH, 2\nINT 21h\n" +
     "POP DX\nPOP CX\nPOP BX\nPOP AX\n" +
     "RET\nPRINT_INT ENDP\n\n";
 	code += $1->getCode();	
@@ -286,7 +388,7 @@ func_definition : type_specifier ID LPAREN parameter_list RPAREN {
 	vector<string> paramTypes = extractedParamInfos[1];
 	SymbolInfo* funcInfo = checkAndInsertFunc($1->getName(), $2->getName(), paramTypes);
 	st.enterScope();
-	insertParams(paramNames, funcInfo);
+	insertParams(extractedParamInfos, funcInfo);
 	variables.push_back($2->getName() + "ReturnVar");
 	currentFunc = $2->getName();
 	hasScopeStarted = 1;
@@ -418,70 +520,45 @@ statement : var_declaration {printLog("statement : var_declaration", $1->getName
 	  | FOR LPAREN expression_statement expression_statement expression RPAREN statement {
 	$$ = new SymbolInfo("for(" + $3->getName() + $4->getName() + $5->getName() + ")" + $7->getName(), "statement");
 	printLog("statement : FOR LPAREN expression_statement expression_statement expression RPAREN statement", $$->getName());
-		string code = $3->getCode();
-		string label1 = newLabel();
-		string label2 = newLabel();
-		code += ";Loop Begin\n";
-		code += label1 + ":\n";
-		code += ";$4 code Begin\n";
-		code += $4->getCode();
-		code += ";$4 code End\n";
-
-		code += "MOV AX," + $4->getAsmName() + "\n"; // ?
-		code += "CMP AX,0\n";
-		code += "JE " + label2 + "\n";
-		code += ";$7 code Begin\n";
-		code += $7->getCode();
-		code += ";$5 code Begin\n";
-		code += $5->getCode();
-		code += "JMP " + label1 + "\n";
-		code += label2 + ":\n";
-		code += ";Loop END\n";
-		$$->setCode(code);
+	string loopStartLabel = newLabel();
+	string loopEndLabel = newLabel();
+	string code = ";loop init\n" + $3->getCode() +
+	loopStartLabel + ":\n;condition\n" + $4->getCode() +
+	"MOV AX, " + $4->getAsmName() + "\nCMP AX, 0\nJE " + loopEndLabel + "\n" +
+	";loop statement\n" + $7->getCode() + ";increment\n" + $5->getCode() + 
+	"JMP " + loopStartLabel + "\n" + loopEndLabel + ":\n" + ";loop end\n";
+	$$->setCode(code);
 }
 	  | IF LPAREN expression RPAREN statement %prec LOWER_THAN_ELSE {
 	$$ = new SymbolInfo("if(" +  $3->getName() + ")" + $5->getName(), "statement");
 	printLog("statement : IF LPAREN expression RPAREN statement", $$->getName());
-		string code = $3->getCode();
-		string label1 = newLabel();
-		code += "MOV AX," + $3->getAsmName() + "\n"; // ?
-		code += "CMP AX,0\n";
-		code += "JE " + label1 + "\n";
-		code += $5->getCode();
-		code += label1 + ":\n";
-		$$->setCode(code);
+	string endIfLabel = newLabel();
+	string code = ";if\n" + $3->getCode() + 
+	"MOV AX, " + $3->getAsmName() + "\nCMP AX, 0\nJE " + endIfLabel + "\n" +
+	";then\n" + $5->getCode() + endIfLabel + ":\n;endif\n";
+	$$->setCode(code);
 }
 	  | IF LPAREN expression RPAREN statement ELSE statement {
 	$$ = new SymbolInfo("if(" +  $3->getName() + ")" + $5->getName() + " else " + $7->getName(), "statement");
 	printLog("statement : IF LPAREN expression RPAREN statement ELSE statement", $$->getName());
-	string code = $3->getCode();
-		string label1 = newLabel();
-		string label2 = newLabel();
-		code += "MOV AX," + $3->getAsmName() + "\n"; // ?
-		code += "CMP AX,0\n";
-		code += "JE " +label1 + "\n";
-		code += $5->getCode();
-		code += "JMP " + label2 + "\n";
-		code += label1 + ":\n";
-		code += $7->getCode();
-		code += label2 + ":\n";
-		$$->setCode(code);
+	string elseLabel = newLabel();
+	string endIfLabel = newLabel();
+	string code = ";if\n" + $3->getCode() + 
+	"MOV AX, " + $3->getAsmName() + "\nCMP AX, 0\nJE " + elseLabel + "\n" +
+	";then\n" + $5->getCode() + "JMP " + endIfLabel + "\n" +
+	";else\n" + elseLabel + ":\n" + $7->getCode() + endIfLabel + ":\n;endif\n";
+	$$->setCode(code);
 }
 	  | WHILE LPAREN expression RPAREN statement {
 	$$ = new SymbolInfo("while(" +  $3->getName() + ")" + $5->getName(), "statement");
 	printLog("statement : WHILE LPAREN expression RPAREN statement", $$->getName());
-	string code = "";
-		string label1 = newLabel();
-		string label2 = newLabel();
-		code += label1 + ":\n";
-		code += $3->getCode();
-		code += "MOV AX," + $3->getAsmName() + "\n"; // ?
-		code += "CMP AX, 0\n";
-		code += "JE " + label2 + "\n";
-		code += $5->getCode();
-		code += "JMP " + label1 + "\n";
-		code += label2 + ":\n";
-		$$->setCode(code);
+	string loopStartLabel = newLabel();
+	string loopEndLabel = newLabel();
+	string code = ";loop start\n" + loopStartLabel + ":\n;condition\n" + $3->getCode() + 
+	"MOV AX, " + $3->getAsmName() + "\n" + "CMP AX, 0\n" + "JE " + loopEndLabel + "\n" +
+	";loop statement\n" + $5->getCode() +
+	"JMP " + loopStartLabel + "\n" + loopEndLabel + ":\n;loop end\n";
+	$$->setCode(code);
 }
 	  | PRINTLN LPAREN ID RPAREN SEMICOLON {
 	string name = $3->getName();
@@ -531,7 +608,9 @@ variable : ID {
 	}
 	$$ = new SymbolInfo(name, "variable", dataType);
 	printLog("variable : ID", name);
-	$$->setAsmName(temp->getAsmName());
+	if(temp != NULL) {
+		$$->setAsmName(temp->getAsmName());
+	}
 }
 	 | ID LTHIRD expression RTHIRD {
 	string name = $1->getName();
@@ -556,14 +635,15 @@ variable : ID {
 			}
 		}	
 	}
-	string code = "";
-	code += $3->getCode() + "MOV BX, " + $3->getAsmName() + "\nADD BX, BX\n";
 	$$ = new SymbolInfo(name + "[" + $3->getName() + "]", "variable", dataType);
 	printLog("variable : ID LTHIRD expression RTHIRD", $$->getName());
+	string code = $3->getCode() + "MOV CX, " + $3->getAsmName() + "\nADD CX, CX\n";
 	//$$->setAssemblyArrayMember(true); // ?
-	$$->setCode(code);
-	$$->setAsmName(temp->getAsmName());
 	$$->setIsArray(true);
+	$$->setCode(code);
+	if(temp != NULL) {
+		$$->setAsmName(temp->getAsmName());	
+	}
 }
 	 ;
 	 
@@ -586,6 +666,7 @@ expression : logic_expression {
 	string code = $1->getCode() + $3->getCode();
 	code += "MOV AX, " + $3->getAsmName() + "\n";
 	if($1->getIsArray()) {
+		code += "MOV BX, CX\n";
 		code += "MOV " + $1->getAsmName() + "[BX], AX\n";
 	} else {
 		code += "MOV " + $1->getAsmName() + ", AX\n";
@@ -608,41 +689,26 @@ logic_expression : rel_expression {
 		handleError("Type Mismatch");
 		type = "";
 	}
-	string code = $1->getCode() + $3->getCode();
-	string temp = newTemp();
-	$$->setAsmName(temp);
-	string label1 = newLabel();
-	string label2 = newLabel();
-	string label3 = newLabel();
-    if ($2->getName() == "||") {
-		code += "MOV AX, " +$1->getAsmName() + "\n" +
-		"CMP AX, 0\n" + 
-		"JNE " + string(label2) + "\n" +
-		"MOV AX, " + $3->getAsmName() + "\n" +
-		"CMP AX, 0\n" +
-		"JNE " + label2 + "\n" +
-		label1 + ":\n" +
-		"MOV " + temp + ", 0\n" +
-		"JMP " + label3 + "\n" +
-		label2 + ":\n" +
-		"MOV " + temp + ", 1\n" +
-		label3 + ":\n";
-	} else if ($2->getName() == "&&") {
-		"MOV AX, " + $1->getAsmName() + "\n" +
-		"CMP AX, 0\n" +
-		"JE " + label2 + "\n" +
-		"MOV AX, " + $3->getAsmName() + "\n" +
-		"CMP AX, 0\n" +
-		"JE " + label2 + "\n" +
-		label1 + ":\n" +
-		"MOV " + temp + ", 1\n" +
-		"JMP " + label3 + "\n" +
-		label2 + ":\n" +
-		"MOV " + temp + ", 0\n" +
-		label3 + ":\n";
-	}
 	$$ = new SymbolInfo($1->getName() + $2->getName() + $3->getName(), "logic_expression", type);
 	printLog("logic_expression : rel_expression LOGICOP rel_expression", $$->getName());
+	string code = $1->getCode() + $3->getCode() + ";logicalExpressionStart\n";
+	string temp = newTemp();
+	$$->setAsmName(temp);
+	string skipConditionLabel = newLabel();
+	string expressionEndLabel = newLabel();
+    if ($2->getName() == "||") {
+		code += "MOV AX, " + $1->getAsmName() + "\nCMP AX, 0\nJNE " + skipConditionLabel + "\n" +
+		"MOV AX, " + $3->getAsmName() + "\nCMP AX, 0\nJNE " + skipConditionLabel + "\n" +
+		";ifExpressionFalse\nMOV " + temp + ", 0\nJMP " + expressionEndLabel + "\n" +
+		skipConditionLabel + ":\n;ifExpressionTrue\nMOV " + temp + ", 1\n" +
+		expressionEndLabel + ":\n;endExpression\n";
+	} else if ($2->getName() == "&&") {
+		code += "MOV AX, " + $1->getAsmName() + "\nCMP AX, 0\nJE " + skipConditionLabel + "\n" +
+		"MOV AX, " + $3->getAsmName() + "\nCMP AX, 0\nJE " + skipConditionLabel + "\n" +
+		";ifExpressionTrue\nMOV " + temp + ", 1\nJMP " + expressionEndLabel + "\n" +
+		skipConditionLabel + ":\n;ifExpressionFalse\nMOV " + temp + ", 0\n" +
+		expressionEndLabel + ":\n;logicalExpressionStart\n";
+	}
 	$$->setCode(code);
 }
 		 ;
@@ -661,32 +727,28 @@ rel_expression : simple_expression {
 	$$ = new SymbolInfo($1->getName() + $2->getName() + $3->getName(), "rel_expression", type);
 	printLog("rel_expression : simple_expression RELOP simple_expression", $$->getName());
 	string temp = newTemp();
-		 $$->setAsmName(temp);
-		 string code = $1->getCode() + $3->getCode();
-		string label1 = newLabel();
-		string label2 = newLabel();
-		code += "MOV AX," + $1->getAsmName() + "\n";
-		code += "CMP AX," + $3->getAsmName() + "\n";	
-		string op = $2->getName();
-        if (op == "<") {
-			code += "JL " + label1 + "\n";
-		} else if (op == ">") {
-			code += "JG " + label1 + "\n";
-		} else if (op == "<=") {
-			code += "JLE " + label1 + "\n";
-		} else if (op == ">=") {
-			code += "JGE " + label1 + "\n";
-		} else if (op == "==") {
-			code += "JE " + label1 + "\n";
-		} else if (op == "!=") {
-			code += "JNE " + label1 + "\n";
-		}
-		code += "MOV " + temp + ", 0\n";
-		code += "JMP " + label2 + "\n";
-		code += label1 + ":\n";
-		code += "MOV " + temp + ", 1\n";
-		code += label2 + ":\n";
-		$$->setCode(code);
+	$$->setAsmName(temp);
+	string code = $1->getCode() + $3->getCode();
+	string trueLabel = newLabel();
+	string relopEndLabel = newLabel();
+	code += "MOV AX, " + $1->getAsmName() + "\nCMP AX, " + $3->getAsmName() + "\n";	
+	string op = $2->getName();
+    if (op == "<") {
+		code += "JL " + trueLabel + "\n";
+	} else if (op == ">") {
+		code += "JG " + trueLabel + "\n";
+	} else if (op == "<=") {
+		code += "JLE " + trueLabel + "\n";
+	} else if (op == ">=") {
+		code += "JGE " + trueLabel + "\n";
+	} else if (op == "==") {
+		code += "JE " + trueLabel + "\n";
+	} else if (op == "!=") {
+		code += "JNE " + trueLabel + "\n";
+	}
+	code += "MOV " + temp + ", 0\nJMP " + relopEndLabel + "\n" +
+	trueLabel + ":\nMOV " + temp + ", 1\n" + relopEndLabel + ":\n";
+	$$->setCode(code);
 }
 		;
 
@@ -778,6 +840,7 @@ factor : variable {
 	string code = $1->getCode();
 	if($1->getIsArray()) {
 		string temp = newTemp();
+		code += "MOV BX, CX\n";
 		code += "MOV AX, " + $1->getAsmName() + "[BX]\n";
 		code += "MOV " + temp + ", AX\n";
 		$$->setAsmName(temp);
@@ -799,7 +862,7 @@ factor : variable {
 	string code = $3->getCode();
 	vector<string> paramAsmNames = funcInfo->getParamAsmNames();
 	//reverse(paramAsmNames.begin(), paramAsmNames.end());
-	cout << paramAsmNames.size();
+	//cout << paramAsmNames.size();
 	for(int i = 0 ; i < paramAsmNames.size(); i++) {
 		code += "MOV AX, " + argumentSymbolInfos[i]->getAsmName() + "\n";
 		code += "MOV " + paramAsmNames[i] + ", AX\n";
@@ -841,14 +904,13 @@ factor : variable {
 	string temp = newTemp();
 	string code = "";
 	if($$->getIsArray()) {
-		code+="MOV AX,"+$1->getAsmName()+"[BX]\n";	
-		code+="MOV "+ temp +",AX\n";
-		code+="MOV AX,"+$1->getAsmName()+"[BX]\n";
-		code+="INC AX\n";
-		code+="MOV "+$1->getAsmName()+"[BX], AX\n";
+		code += "MOV BX, CX\n";
+		code += "MOV AX, " + $1->getAsmName() + "[BX]\n" + "MOV " + temp + ", AX\n" +
+		"MOV AX, " + $1->getAsmName() + "[BX]\nINC AX\n" +
+		"MOV " + $1->getAsmName() + "[BX], AX\n";
 	} else {
 		code += "MOV AX, " + $1->getAsmName() + "\nMOV " + temp + ", AX\n" +
-		"INC " + $1->getAsmName() + "\n"; // confused :(
+		"INC " + $1->getAsmName() + "\n";
 	}
 	$$->setCode(code);
 	$$->setAsmName(temp);
@@ -859,11 +921,10 @@ factor : variable {
 	string temp = newTemp();
 	string code = "";
 	if($$->getIsArray()) {
-		code+="MOV AX,"+$1->getAsmName()+"[BX]\n";	
-		code+="MOV "+ temp +",AX\n";
-		code+="MOV AX,"+$1->getAsmName()+"[BX]\n";
-		code+="DEC AX\n";
-		code+="MOV "+$1->getAsmName()+"[BX], AX\n";
+		code += "MOV BX, CX\n";
+		code += "MOV AX, " + $1->getAsmName() + "[BX]\n" + "MOV " + temp + ", AX\n" +
+		"MOV AX, " + $1->getAsmName() + "[BX]\nDEC AX\n" +
+		"MOV " + $1->getAsmName() + "[BX], AX\n";
 	} else {
 		code+="MOV AX, " + $1->getAsmName() + "\nMOV "+ temp + ",AX\n" +	
 		"DEC " + $1->getAsmName() + "\n";
@@ -889,12 +950,14 @@ arguments : arguments COMMA logic_expression {
 	printLog("arguments : arguments COMMA logic_expression", $$->getName());
 	argumentSymbolInfos.push_back($3);
 	$$->setCode($1->getCode() + $3->getCode());
+		cout << $3->getName() << " " << $3->getDataType() << " yo\n";
 }
 	      | logic_expression {
 	argumentTypes.push_back($1->getDataType());
 	printLog("arguments : logic_expression", $1->getName());
 	argumentSymbolInfos.push_back($1);
 	$$->setCode($1->getCode());
+		cout << $$->getName() << " " << $$->getDataType() << " yo\n";
 }
 	      ;
  
@@ -908,7 +971,7 @@ int main(int argc,char *argv[]) {
 
 	log_.open("log.txt");
 	error.open("error.txt");
-	asmFile.open("assemblyCode.asm");
+	asmFile.open("code.asm");
 	
 	line_count = 1;
 	error_count = 0;
@@ -923,6 +986,8 @@ int main(int argc,char *argv[]) {
 	fclose(yyin);
 	log_.close();
 	error.close();
+	
+	peepholeOptimize();
 	
 	return 0;
 }
