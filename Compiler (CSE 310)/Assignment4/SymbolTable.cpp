@@ -8,7 +8,8 @@ class SymbolInfo {
     SymbolInfo* next;
     vector<string> paramTypes, paramAsmNames;
     bool isFunction;
-    bool isArray; //only for code generation purpose 
+    bool isArray; //only for code generation purpose
+    vector<SymbolInfo*> children; //children in parse tree
 
 public:
     SymbolInfo(string name, string type, string dataType = "", bool isFunction = 0) {
@@ -19,6 +20,7 @@ public:
         next = NULL;
         code = asmName = "";
         isArray = false;
+        
     }
     void setName(string name) {this->name = name;}
     string getName() {return name;}
@@ -37,6 +39,8 @@ public:
     vector<string> getParamTypes() {return paramTypes;}
     void setParamAsmNames(vector<string> paramAsmNames) {this->paramAsmNames = paramAsmNames;}
     vector<string> getParamAsmNames() {return paramAsmNames;}
+    void addChild(SymbolInfo* symbolInfo) {children.push_back(symbolInfo);}
+    vector<SymbolInfo*> getChildren() {return children;}
     SymbolInfo* getNext() {return next;}
 };
 

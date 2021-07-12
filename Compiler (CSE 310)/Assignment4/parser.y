@@ -23,6 +23,7 @@ int labelCount = 0;
 int tempCount = 0;
 string currentFunc;
 vector<SymbolInfo*> argumentSymbolInfos;
+vector<string> argAsmNames;
 //
 
 extern FILE* yyin;
@@ -99,7 +100,6 @@ void insertParams(vector<vector<string>> extractedParamInfos, SymbolInfo* funcIn
     		variables.push_back(asmName);
     	}
 	}
-	//for(string paramAsmName: paramAsmNames) {cout << paramAsmName;}
 	funcInfo->setParamAsmNames(paramAsmNames);
 }
 
@@ -159,26 +159,31 @@ SymbolInfo* checkAndInsertFunc(string returnType, string name, vector<string> pa
 	return funcInfo;
 }
 
-void verifyFunctionCall(SymbolInfo* funcInfo) {
+void verifyFunctionCall(SymbolInfo* funcInfo, SymbolInfo* arguments) {
 	vector<string> declaredParamTypes = funcInfo->getParamTypes();
 	string name = funcInfo->getName();
-	/*for(int i=0; i<argumentTypes.size(); i++) {
-		cout << argumentTypes[i] << " ";
+	vector<string> argTypes;
+	if(arguments->getChildren().size() > 0) {
+		arguments = arguments->getChildren()[0];
+		while(arguments->getChildren()[0]->getType() == "arguments"){
+			argTypes.push_back(arguments->getChildren()[1]->getDataType());
+			argAsmNames.push_back(arguments->getChildren()[1]->getAsmName());
+		    arguments = arguments->getChildren()[0];
+		}
+    	argTypes.push_back(arguments->getChildren()[0]->getDataType());
+    	argAsmNames.push_back(arguments->getChildren()[0]->getAsmName());
 	}
-	cout << "\n";
-	for(int i=0; i<declaredParamTypes.size(); i++) {
-		cout << declaredParamTypes[i] << " ";
-	}*/
-	cout << argumentTypes.size() << " " << declaredParamTypes.size() << " yo\n";
-	if(argumentTypes.size() != declaredParamTypes.size()) {
+	
+	cout << argTypes.size() << " " << declaredParamTypes.size() << " yo\n";
+	if(argTypes.size() != declaredParamTypes.size()) {
 		handleError("Total number of arguments mismatch in function " + name);
 	} else {
-		for(int i=0; i<argumentTypes.size(); i++) {
-			cout << argumentTypes[i] << " " << declaredParamTypes[i] << " " << name << "\n";
-			if(argumentTypes[i] != declaredParamTypes[i]) {
+		for(int i = 0; i < argTypes.size(); i++) {
+			cout << argTypes[i] << " " << declaredParamTypes[i] << " " << name << "\n";
+			if(argTypes[i] != declaredParamTypes[i]) {
 				handleError(to_string(i+1) + "th argument mismatch in function " + name); break;
 			} else {
-				if(argumentTypes[i] == "void") handleError("Invalid use of void expression");
+				if(argTypes[i] == "void") handleError("Invalid use of void expression");
 			}
 		}	
 	}
@@ -208,54 +213,6 @@ string newTemp() {
 	return temp;
 }
 
-/*static inline std::string trim_copy(std::string s) {
-    trim(s);
-    return s;
-}
-
-string findCmd(string line) {
-	int i = 0;
-	int len = line.size();
-	for(i = 0; line[i]!=' '; i++) {
-		if(i >= len) {
-			return "";
-		}
-	}
-	return line.substr(0,i);
-}
-
-
-string findDestArg(string line) {
-	int i=0;
-	int len = line.size();
-	for(i = 0; line[i]!=' '; i++) {
-		if(i >= len) {
-			return "";
-		}
-	}
-	i++;
-	int j = i + 1;
-	for( ; line[j] != ',' ; j++) {	
-		if(j >= line.size()) {
-			return "";
-		}
-	}
-	return trim_copy(line.substr(i, j-i));
-}
-
-
-string findSrcArg(string line) {
-	int len = line.size();
-	int i = 0;
-	for(i = 0; line[i]!= ','; i++) {
-		if(i >= len) {
-			return "";
-		}
-	}
-	i += 1;
-	return trim_copy(line.substr(i, len-i));
-}*/
-
 void peepholeOptimize() {
 	ifstream in("code.asm");
 	ofstream out("optimized_code.asm");
@@ -281,10 +238,6 @@ void peepholeOptimize() {
 			return;
 		}
 		if(currLine == "") continue;
-		// cout << "\nLine: " << currLine << endl;
-		// cout << "CMD: " << findCmd(currLine) << endl;
-		// cout << "Source Arg: " << findSrcArg(currLine) << endl;
-		// cout << "Dest Arg: " << findDestArg(currLine) << "\n\n";
 		vector<string> prevTokens = tokenizeAsmInstruction(prevLine);
 		vector<string> currTokens = tokenizeAsmInstruction(currLine);
 		if(prevTokens[0] == "MOV" && currTokens[0] == "MOV") {	
@@ -856,15 +809,14 @@ factor : variable {
 	if(funcInfo == NULL) {
 		handleError("Undeclared function " + name);
 	} else {
-		verifyFunctionCall(funcInfo);
+		verifyFunctionCall(funcInfo, $3);
 		dataType = funcInfo->getDataType();
 	}
 	string code = $3->getCode();
 	vector<string> paramAsmNames = funcInfo->getParamAsmNames();
-	//reverse(paramAsmNames.begin(), paramAsmNames.end());
-	//cout << paramAsmNames.size();
+	reverse(paramAsmNames.begin(), paramAsmNames.end());
 	for(int i = 0 ; i < paramAsmNames.size(); i++) {
-		code += "MOV AX, " + argumentSymbolInfos[i]->getAsmName() + "\n";
+		code += "MOV AX, " + argAsmNames[i] + "\n";
 		code += "MOV " + paramAsmNames[i] + ", AX\n";
 
 	}
@@ -873,6 +825,7 @@ factor : variable {
 	string temp = newTemp();
 	code += "MOV " + temp + ", AX\n";
 	argumentSymbolInfos.clear();
+	argAsmNames.clear();
 	$$ = new SymbolInfo(name + "(" + $3->getName() + ")", "factor", dataType);
 	printLog("factor : ID LPAREN argument_list RPAREN", $$->getName());
 	$$->setCode(code);
@@ -935,8 +888,10 @@ factor : variable {
 	;
 	
 argument_list : arguments {
+	$$ = new SymbolInfo($1->getName(), "argument_list");
 	printLog("argument_list : arguments", $1->getName());
-	$$->setCode($1->getCode());	
+	$$->setCode($1->getCode());
+	$$->addChild($1);
 }
 	| {
 	$$ = new SymbolInfo("", "argument_list");
@@ -950,14 +905,17 @@ arguments : arguments COMMA logic_expression {
 	printLog("arguments : arguments COMMA logic_expression", $$->getName());
 	argumentSymbolInfos.push_back($3);
 	$$->setCode($1->getCode() + $3->getCode());
-		cout << $3->getName() << " " << $3->getDataType() << " yo\n";
+	cout << $3->getName() << " " << $3->getDataType() << " yo\n";
+	$$->addChild($1); $$->addChild($3);
 }
 	      | logic_expression {
 	argumentTypes.push_back($1->getDataType());
+	$$ = new SymbolInfo($1->getName(), "arguments");
 	printLog("arguments : logic_expression", $1->getName());
 	argumentSymbolInfos.push_back($1);
 	$$->setCode($1->getCode());
-		cout << $$->getName() << " " << $$->getDataType() << " yo\n";
+	cout << $$->getName() << " " << $$->getDataType() << " yo\n";
+	$$->addChild($1);
 }
 	      ;
  
