@@ -13,7 +13,6 @@ ofstream error;
 ofstream asmFile;
 bool hasScopeStarted;
 vector<pair<string, string>> declaration_list; // second element is size of array ("0" will be stored for variables)
-vector<string> argumentTypes;
 vector<string> undefinedFunctions;
 
 //these variables are for code generation
@@ -22,7 +21,6 @@ vector<pair<string, string>> arrays;
 int labelCount = 0;
 int tempCount = 0;
 string currentFunc;
-vector<SymbolInfo*> argumentSymbolInfos;
 vector<string> argAsmNames;
 //
 
@@ -174,12 +172,10 @@ void verifyFunctionCall(SymbolInfo* funcInfo, SymbolInfo* arguments) {
     	argAsmNames.push_back(arguments->getChildren()[0]->getAsmName());
 	}
 	
-	cout << argTypes.size() << " " << declaredParamTypes.size() << " yo\n";
 	if(argTypes.size() != declaredParamTypes.size()) {
 		handleError("Total number of arguments mismatch in function " + name);
 	} else {
 		for(int i = 0; i < argTypes.size(); i++) {
-			cout << argTypes[i] << " " << declaredParamTypes[i] << " " << name << "\n";
 			if(argTypes[i] != declaredParamTypes[i]) {
 				handleError(to_string(i+1) + "th argument mismatch in function " + name); break;
 			} else {
@@ -187,7 +183,6 @@ void verifyFunctionCall(SymbolInfo* funcInfo, SymbolInfo* arguments) {
 			}
 		}	
 	}
-	argumentTypes.clear();
 }
 
 string determineType(string dType1, string dType2) {
@@ -591,7 +586,6 @@ variable : ID {
 	$$ = new SymbolInfo(name + "[" + $3->getName() + "]", "variable", dataType);
 	printLog("variable : ID LTHIRD expression RTHIRD", $$->getName());
 	string code = $3->getCode() + "MOV CX, " + $3->getAsmName() + "\nADD CX, CX\n";
-	//$$->setAssemblyArrayMember(true); // ?
 	$$->setIsArray(true);
 	$$->setCode(code);
 	if(temp != NULL) {
@@ -824,7 +818,6 @@ factor : variable {
 	code += "MOV AX, " + $1->getName() + "ReturnVar\n";
 	string temp = newTemp();
 	code += "MOV " + temp + ", AX\n";
-	argumentSymbolInfos.clear();
 	argAsmNames.clear();
 	$$ = new SymbolInfo(name + "(" + $3->getName() + ")", "factor", dataType);
 	printLog("factor : ID LPAREN argument_list RPAREN", $$->getName());
@@ -900,21 +893,15 @@ argument_list : arguments {
 	;
 	
 arguments : arguments COMMA logic_expression {
-	argumentTypes.push_back($3->getDataType());
 	$$ = new SymbolInfo($1->getName() + "," + $3->getName(), "arguments");
 	printLog("arguments : arguments COMMA logic_expression", $$->getName());
-	argumentSymbolInfos.push_back($3);
 	$$->setCode($1->getCode() + $3->getCode());
-	cout << $3->getName() << " " << $3->getDataType() << " yo\n";
 	$$->addChild($1); $$->addChild($3);
 }
 	      | logic_expression {
-	argumentTypes.push_back($1->getDataType());
 	$$ = new SymbolInfo($1->getName(), "arguments");
 	printLog("arguments : logic_expression", $1->getName());
-	argumentSymbolInfos.push_back($1);
 	$$->setCode($1->getCode());
-	cout << $$->getName() << " " << $$->getDataType() << " yo\n";
 	$$->addChild($1);
 }
 	      ;
