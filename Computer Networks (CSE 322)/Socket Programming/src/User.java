@@ -3,36 +3,40 @@ import java.util.Queue;
 
 class User {
     private int id;
-    private boolean loginStatus;
     private Queue<String> messages;
+    private ServerThread serverThread;
 
-    User(int id, boolean loginStatus) {
+    User(int id, ServerThread serverThread) {
         this.id = id;
-        this.loginStatus = loginStatus;
         messages = new LinkedList<>();
+        this.serverThread = serverThread;
     }
 
     int getId() {
         return id;
     }
 
-    void setId(int id) {
-        this.id = id;
-    }
-
     boolean isLoggedIn() {
-        return loginStatus;
+        return serverThread != null;
     }
 
-    void setLoginStatus(boolean loginStatus) {
-        this.loginStatus = loginStatus;
+    String showUnreadMessages() {
+        StringBuilder allMessages = new StringBuilder("unread messages:\n");
+        while(!messages.isEmpty()) {
+            allMessages.append(messages.remove()).append("\n");
+        }
+        return allMessages.toString();
     }
 
-    public Queue<String> getMessages() {
-        return messages;
+    void addUnreadMessage(String message) {
+        messages.add(message);
     }
 
-    public void setMessages(Queue<String> messages) {
-        this.messages = messages;
+    ServerThread getServerThread() {
+        return serverThread;
+    }
+
+    void setServerThread(ServerThread serverThread) {
+        this.serverThread = serverThread;
     }
 }
