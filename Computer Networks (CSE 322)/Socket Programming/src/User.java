@@ -21,9 +21,9 @@ class User {
     }
 
     String showUnreadMessages() {
-        StringBuilder allMessages = new StringBuilder("unread messages:\n");
+        StringBuilder allMessages = new StringBuilder();
         while(!messages.isEmpty()) {
-            allMessages.append(messages.remove()).append("\n");
+            allMessages.append(messages.remove()).append("\n\n");
         }
         return allMessages.toString();
     }

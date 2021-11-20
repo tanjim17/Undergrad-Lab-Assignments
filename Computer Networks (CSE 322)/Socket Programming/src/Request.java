@@ -2,10 +2,10 @@ public class Request {
     private int reqId;
     private int senderId;
     private String description;
-    private static int lastReqID = 0;
+    private static int lastReqId = 0;
 
     public Request(int senderId, String description) {
-        reqId = ++lastReqID;
+        reqId = ++lastReqId;
         this.senderId = senderId;
         this.description = description;
     }
@@ -23,6 +23,6 @@ public class Request {
     }
 
     public String toString() {
-        return "new request: " + description + "\nsender: " + senderId;
+        return "request id: " + reqId + "\nrequest: " + description + "\nsender id: " + senderId;
     }
 }

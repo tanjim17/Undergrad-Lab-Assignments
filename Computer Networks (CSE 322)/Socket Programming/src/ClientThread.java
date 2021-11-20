@@ -5,6 +5,7 @@ class ClientThread extends Thread {
     private Socket socket;
     //private BufferedReader in;
     private ObjectInputStream in;
+    volatile static boolean ack;
 
     ClientThread(Socket socket) {
         this.socket = socket;
@@ -14,6 +15,7 @@ class ClientThread extends Thread {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        ack = false;
     }
 
     public void run() {
@@ -24,24 +26,30 @@ class ClientThread extends Thread {
                     parseMessage((String) obj);
                 }
             } catch (IOException | ClassNotFoundException e) {
-                e.printStackTrace();
+                System.out.println("connection lost!");
+                break;
             }
         }
     }
 
     private void parseMessage(String message) {
         String[] data = message.split(" ");
-        //if (data.length == 0) return;
         switch (data[0]) {
             case "d":
-                receiveFile(data[1], Integer.parseInt(data[2]), Integer.parseInt(data[3]));
+                download(data[1], Integer.parseInt(data[2]), Integer.parseInt(data[3]));
+                break;
+            case "u":
+                new UploadThread(socket, data[1], Integer.parseInt(data[2])).start();
+                break;
+            case "ok":
+                ack = true;
                 break;
             default:
                 System.out.println(message);
         }
     }
 
-    private void receiveFile(String filename, int fileSize, int maxChunkSize) {
+    private void download(String filename, int fileSize, int maxChunkSize) {
         System.out.println(fileSize + " " + maxChunkSize);
         try {
             FileOutputStream fos = new FileOutputStream(filename);
@@ -51,13 +59,13 @@ class ClientThread extends Thread {
             byte[] contents = new byte[maxChunkSize];
             int bytesRead = 0;
             while (bytesRead < fileSize) {
-                //bytesRead = is.read(contents);
                 int chunkSize = is.read(contents);
                 System.out.println(chunkSize);
                 bos.write(contents, 0, chunkSize);
                 bytesRead += chunkSize;
             }
             bos.flush();
+            fos.close();
         } catch (IOException e) {
             System.err.println("failed to download!");
         }

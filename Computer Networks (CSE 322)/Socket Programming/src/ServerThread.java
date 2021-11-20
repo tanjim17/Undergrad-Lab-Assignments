@@ -6,7 +6,7 @@ import java.util.List;
 
 class ServerThread extends Thread {
     private Socket socket;
-//    private BufferedReader in;
+    //    private BufferedReader in;
 //    private PrintWriter out;
     private ObjectInputStream in;
     private ObjectOutputStream out;
@@ -14,6 +14,7 @@ class ServerThread extends Thread {
     private static List<User> users = new ArrayList<>();
     private static List<Request> requests = new ArrayList<>();
     private final static int MAX_BUFFER_SIZE = 1000000, MAX_CHUNK_SIZE = 10000, MIN_CHUNK_SIZE = 1000;
+    private static int buffer_size = 0;
 
     ServerThread(Socket socket) {
         this.socket = socket;
@@ -34,18 +35,18 @@ class ServerThread extends Thread {
                 String message = (String) in.readObject();
                 parseMessage(message);
             } catch (IOException | ClassNotFoundException e) {
-                if(currUser != null)
+                System.out.println(currUser.getId() + " disconnected!");
+                if (currUser != null)
                     logout();
                 break;
             }
         }
     }
 
-    private void parseMessage(String message) throws IOException{
+    private void parseMessage(String message) throws IOException {
         String[] data = message.split(" ");
         if (currUser == null) {
             login(data);
-            out.writeObject(currUser.showUnreadMessages());
             return;
         }
         switch (data[0]) {
@@ -55,45 +56,55 @@ class ServerThread extends Thread {
                 }
                 break;
             case "dir":
-                String rootPathName = "files/" + currUser.getId() + "/";
-                out.writeObject("private:");
-                sendFileList(rootPathName + "private");
+                String rootPathName = "files/" + (data.length == 1 ? currUser.getId() : data[1]) + "/";
+                if (data.length == 1) {
+                    out.writeObject("private:");
+                    sendFileList(rootPathName + "private");
+                }
                 out.writeObject("public:");
                 sendFileList(rootPathName + "public");
-                break;
-            case "see":
-                sendFileList("files/" + data[1] + "/public");
                 break;
             case "out":
                 logout();
                 break;
             case "d":
                 String path = "files/" + data[1];
-                if(Integer.parseInt(data[1]) == currUser.getId() && data.length == 4 && data[3].equals("pvt")) {
+                if (Integer.parseInt(data[1]) == currUser.getId() && data.length == 4 && data[3].equals("private")) {
                     path += "/private/";
                 } else path += "/public/";
                 path += data[2];
-                File file = new File( path);
-                if(file.exists()) {
+                File file = new File(path);
+                if (file.exists()) {
                     out.writeObject("d " + data[2] + " " + file.length() + " " + MAX_CHUNK_SIZE);
-                    transferFile(file);
+                    sendFile(file);
                 }
                 break;
             case "r":
                 Request request = new Request(currUser.getId(), data[1]);
                 requests.add(request);
                 for (User user : users) {
-                    if(user == currUser) continue;
-                    if(user.isLoggedIn())
-                        user.getServerThread().getObjectOutputStream().writeObject(request.toString());
-                    else
-                        user.addUnreadMessage(request.toString());
+                    if (user != currUser) user.addUnreadMessage(request.toString());
                 }
-
+                break;
+            case "u":
+                int fileSize = Integer.parseInt(data[4]);
+                if (fileSize + buffer_size > MAX_BUFFER_SIZE) {
+                    out.writeObject("not enough space!");
+                } else {
+                    buffer_size += fileSize;
+                    int chunkSize = (int) (Math.random() * (MAX_CHUNK_SIZE - MIN_CHUNK_SIZE)) + MIN_CHUNK_SIZE;
+                    chunkSize = 500;
+                    out.writeObject("u " + data[1] + " " + chunkSize);
+                    receiveFile(data[1], fileSize, chunkSize, data[2], Integer.parseInt(data[3]));
+                }
+                break;
+            case "v":
+                out.writeObject(currUser.showUnreadMessages());
+                break;
         }
     }
 
-    private void login(String[] data) throws IOException{
+    private void login(String[] data) throws IOException {
         if (!data[0].equals("l")) return;
         int id = Integer.parseInt(data[1]);
         for (User user : users) {
@@ -120,9 +131,10 @@ class ServerThread extends Thread {
         currUser = null;
     }
 
-    private void transferFile(File file) {
+    private void sendFile(File file) {
         try {
-            BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file));
+            FileInputStream fis = new FileInputStream(file);
+            BufferedInputStream bis = new BufferedInputStream(fis);
             OutputStream os = socket.getOutputStream();
             long bytesSent = 0;
             byte[] chunk = new byte[MAX_CHUNK_SIZE];
@@ -130,24 +142,85 @@ class ServerThread extends Thread {
                 int chunkSize = bis.read(chunk);
                 os.write(chunk, 0, chunkSize);
                 System.out.println(chunkSize);
-                //out.writeObject(Arrays.copyOfRange(chunk, 0, chunkSize));
                 bytesSent += chunkSize;
             }
             os.flush();
-            //out.flush();
-            System.out.println("file sent successfully!");
+            fis.close();
+            out.writeObject("file downloaded!");
         } catch (IOException e) {
-            System.err.println("couldn't transfer file!");
+            e.printStackTrace();
         }
     }
 
-    private ObjectOutputStream getObjectOutputStream() {
-        return out;
+    private void receiveFile(String fileName, int fileSize, int maxChunkSize, String fileType, int reqId) {
+        System.out.println(fileSize + " " + maxChunkSize);
+        File file = new File("files/" + currUser.getId() + "/" + fileType + "/" + fileName);
+        FileOutputStream fos = null;
+        try {
+            fos = new FileOutputStream(file);
+            BufferedOutputStream bos = new BufferedOutputStream(fos);
+            InputStream is = socket.getInputStream();
+
+            byte[] contents = new byte[maxChunkSize];
+            int bytesRead = 0;
+            while (bytesRead < fileSize) {
+                int chunkSize = is.read(contents);
+                System.out.println(chunkSize);
+                if (chunkSize == 7 && Arrays.equals(Arrays.copyOfRange(contents, 0, 7), "timeout".getBytes())) {
+                    break;
+                }
+                bos.write(contents, 0, chunkSize);
+                bytesRead += chunkSize;
+//                try {
+//                    Thread.sleep(3000);
+//                } catch (InterruptedException e) {
+//                    e.printStackTrace();
+//                }
+                out.writeObject("ok");
+            }
+            bos.flush();
+            fos.close();
+            if (bytesRead < fileSize) cleanUp(file);
+            int chunkSize = is.read(contents);
+            System.out.println(chunkSize);
+            if (chunkSize == 9 && Arrays.equals(Arrays.copyOfRange(contents, 0, 9), "completed".getBytes())) {
+                if (bytesRead == fileSize) {
+                    out.writeObject("file uploaded!");
+                    if (reqId != 0 && fileType.equals("public")) {
+                        for (Request request : requests) {
+                            if (reqId == request.getReqId()) {
+                                for (User user : users) {
+                                    if (user.getId() == request.getSenderId()) {
+                                        user.addUnreadMessage("requested file uploaded!" + "\nfile name: " +
+                                                fileName + "\nuploader id: " + currUser.getId());
+                                        break;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                } else cleanUp(file);
+            }
+        } catch (IOException e) {
+            try {
+                if (fos != null) fos.close();
+                cleanUp(file);
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+        }
+        buffer_size -= fileSize;
     }
 
-    private void sendFileList(String path) throws IOException{
+    private void sendFileList(String path) throws IOException {
         File[] files = new File(path).listFiles();
         if (files != null)
             for (File file : files) out.writeObject(file.getName());
+    }
+
+    private void cleanUp(File file) throws IOException {
+        out.writeObject("uploading failed!");
+        if (!file.delete()) System.out.println("couldn't remove file!");
     }
 }
