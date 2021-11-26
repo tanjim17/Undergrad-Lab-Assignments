@@ -1,44 +1,43 @@
 import java.io.*;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 class ServerThread extends Thread {
-    private Socket socket;
-    //    private BufferedReader in;
-//    private PrintWriter out;
-    private ObjectInputStream in;
-    private ObjectOutputStream out;
+    private Socket fileSocket;
+    private BufferedReader in;
+    private PrintWriter out;
     private User currUser;
     private static List<User> users = new ArrayList<>();
     private static List<Request> requests = new ArrayList<>();
-    private final static int MAX_BUFFER_SIZE = 1000000, MAX_CHUNK_SIZE = 10000, MIN_CHUNK_SIZE = 1000;
-    private static int buffer_size = 0;
+    private final static int MAX_BUFFER_SIZE = (int) 2e8, MAX_CHUNK_SIZE = (int) 1e3, MIN_CHUNK_SIZE = (int) 5e2;
+    private static int bufferSize = 0;
+    private Thread receiveThread;
+    private volatile boolean isReceiveCompleted;
+    private volatile boolean isReceiveInterrupted;
+    private static Hashtable<Integer, Hashtable<Integer, FileInfo>> fileTable = new Hashtable<>();
 
-    ServerThread(Socket socket) {
-        this.socket = socket;
+    ServerThread(Socket socket, Socket fileSocket) {
+        this.fileSocket = fileSocket;
         try {
-            //in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            //out = new PrintWriter(socket.getOutputStream(), true);
-            in = new ObjectInputStream(socket.getInputStream());
-            out = new ObjectOutputStream(socket.getOutputStream());
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            out = new PrintWriter(socket.getOutputStream(), true);
         } catch (IOException e) {
             e.printStackTrace();
         }
         currUser = null;
+        receiveThread = null;
+        isReceiveCompleted = isReceiveInterrupted = false;
     }
 
     public void run() {
         while (true) {
             try {
-                String message = (String) in.readObject();
+                String message = in.readLine();
                 parseMessage(message);
-            } catch (IOException | ClassNotFoundException e) {
-                System.out.println(currUser.getId() + " disconnected!");
-                if (currUser != null)
+            } catch (IOException e) {
+                if (currUser != null) {
                     logout();
-                break;
+                }
             }
         }
     }
@@ -52,54 +51,69 @@ class ServerThread extends Thread {
         switch (data[0]) {
             case "ls":
                 for (User user : users) {
-                    out.writeObject(user.getId() + " " + user.isLoggedIn());
+                    out.println(user.getId() + " " + (user.isLoggedIn() ? "active" : "inactive"));
                 }
                 break;
             case "dir":
-                String rootPathName = "files/" + (data.length == 1 ? currUser.getId() : data[1]) + "/";
-                if (data.length == 1) {
-                    out.writeObject("private:");
-                    sendFileList(rootPathName + "private");
+                int id = data.length == 1 ? currUser.getId() : Integer.parseInt(data[1]);
+                Hashtable<Integer, FileInfo> table = fileTable.get(id);
+                Enumeration<Integer> e = table.keys();
+                while (e.hasMoreElements()) {
+                    int fileId = e.nextElement();
+                    FileInfo fileInfo = table.get(fileId);
+                    if (id != currUser.getId() && fileInfo.getType().equals("private")) continue;
+                    out.println(fileId + " " + fileInfo.getName() + " " + fileInfo.getType());
                 }
-                out.writeObject("public:");
-                sendFileList(rootPathName + "public");
                 break;
             case "out":
                 logout();
                 break;
             case "d":
-                String path = "files/" + data[1];
-                if (Integer.parseInt(data[1]) == currUser.getId() && data.length == 4 && data[3].equals("private")) {
-                    path += "/private/";
-                } else path += "/public/";
-                path += data[2];
-                File file = new File(path);
+                int uploaderId = Integer.parseInt(data[1]);
+                int fileId = Integer.parseInt(data[2]);
+                FileInfo fileInfo = fileTable.get(uploaderId).get(fileId);
+                if (fileInfo == null) break;
+                if (fileInfo.getType().equals("private") && currUser.getId() != uploaderId) {
+                    out.println("you can't download private files of others!");
+                    break;
+                }
+                File file = new File("files/" + uploaderId + "/" + fileInfo.getType() +
+                        "/" + fileInfo.getName());
                 if (file.exists()) {
-                    out.writeObject("d " + data[2] + " " + file.length() + " " + MAX_CHUNK_SIZE);
-                    sendFile(file);
+                    out.println("d " + fileInfo.getName() + " " + file.length() + " " + MAX_CHUNK_SIZE);
+                    new Thread(() -> sendFile(file)).start();
+                } else {
+                    out.println("file doesn't exist!");
                 }
                 break;
             case "r":
                 Request request = new Request(currUser.getId(), data[1]);
                 requests.add(request);
                 for (User user : users) {
-                    if (user != currUser) user.addUnreadMessage(request.toString());
+                    if (user != currUser) user.receiveMessage(request.toString());
                 }
                 break;
             case "u":
                 int fileSize = Integer.parseInt(data[4]);
-                if (fileSize + buffer_size > MAX_BUFFER_SIZE) {
-                    out.writeObject("not enough space!");
+                if (fileSize + bufferSize > MAX_BUFFER_SIZE) {
+                    out.println("not enough space!");
                 } else {
-                    buffer_size += fileSize;
+                    bufferSize += fileSize;
                     int chunkSize = (int) (Math.random() * (MAX_CHUNK_SIZE - MIN_CHUNK_SIZE)) + MIN_CHUNK_SIZE;
-                    chunkSize = 500;
-                    out.writeObject("u " + data[1] + " " + chunkSize);
-                    receiveFile(data[1], fileSize, chunkSize, data[2], Integer.parseInt(data[3]));
+                    out.println("u " + data[1] + " " + chunkSize);
+                    receiveThread = new Thread(() -> receiveFile(data[1], fileSize, chunkSize, data[2],
+                            Integer.parseInt(data[3])));
+                    receiveThread.start();
                 }
                 break;
             case "v":
-                out.writeObject(currUser.showUnreadMessages());
+                out.println(currUser.showUnreadMessages());
+                break;
+            case "timeout":
+                if (receiveThread != null) isReceiveInterrupted = true;
+                break;
+            case "completed":
+                if (receiveThread != null) isReceiveCompleted = true;
                 break;
         }
     }
@@ -109,24 +123,28 @@ class ServerThread extends Thread {
         int id = Integer.parseInt(data[1]);
         for (User user : users) {
             if (user.getId() == id) {
-                if (user.isLoggedIn()) out.writeObject("already logged in!");
+                if (user.isLoggedIn()) out.println("already logged in!");
                 else {
                     user.setServerThread(this);
                     currUser = user;
+                    out.println("logged in!");
                 }
                 return;
             }
         }
         currUser = new User(id, this);
         users.add(currUser);
+        fileTable.put(id, new Hashtable<>());
         String rootPath = "files/" + data[1];
-        if (!new File(rootPath + "/public").mkdirs() ||
-                !new File(rootPath + "/private").mkdir()) {
-            out.writeObject("couldn't create directory!");
-        }
+        if (new File(rootPath + "/public").mkdirs() &&
+                new File(rootPath + "/private").mkdir()) {
+            out.println("account created!");
+        } else out.println("account creation failed!");
     }
 
     private void logout() {
+        System.out.println(currUser.getId() + " disconnected!");
+        out.println("logged out!");
         currUser.setServerThread(null);
         currUser = null;
     }
@@ -135,92 +153,91 @@ class ServerThread extends Thread {
         try {
             FileInputStream fis = new FileInputStream(file);
             BufferedInputStream bis = new BufferedInputStream(fis);
-            OutputStream os = socket.getOutputStream();
-            long bytesSent = 0;
+            OutputStream os = fileSocket.getOutputStream();
+            int bytesSent = 0;
             byte[] chunk = new byte[MAX_CHUNK_SIZE];
             while (bytesSent < file.length()) {
                 int chunkSize = bis.read(chunk);
                 os.write(chunk, 0, chunkSize);
-                System.out.println(chunkSize);
                 bytesSent += chunkSize;
             }
             os.flush();
             fis.close();
-            out.writeObject("file downloaded!");
+            out.println("fileSent");
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private void receiveFile(String fileName, int fileSize, int maxChunkSize, String fileType, int reqId) {
-        System.out.println(fileSize + " " + maxChunkSize);
+    private void receiveFile(String fileName, int fileSize, int chunkSize, String fileType, int reqId) {
         File file = new File("files/" + currUser.getId() + "/" + fileType + "/" + fileName);
         FileOutputStream fos = null;
         try {
             fos = new FileOutputStream(file);
             BufferedOutputStream bos = new BufferedOutputStream(fos);
-            InputStream is = socket.getInputStream();
+            InputStream is = fileSocket.getInputStream();
 
-            byte[] contents = new byte[maxChunkSize];
-            int bytesRead = 0;
-            while (bytesRead < fileSize) {
-                int chunkSize = is.read(contents);
-                System.out.println(chunkSize);
-                if (chunkSize == 7 && Arrays.equals(Arrays.copyOfRange(contents, 0, 7), "timeout".getBytes())) {
+            byte[] contents = new byte[chunkSize];
+            int totalBytesRead = 0;
+            while (totalBytesRead < fileSize) {
+                int bytesRead = is.read(contents);
+                if (bytesRead == 7 && isReceiveInterrupted
+                        && Arrays.equals(Arrays.copyOfRange(contents, 0, 7), "timeout".getBytes())) {
                     break;
                 }
-                bos.write(contents, 0, chunkSize);
-                bytesRead += chunkSize;
+                bos.write(contents, 0, bytesRead);
+                totalBytesRead += bytesRead;
 //                try {
-//                    Thread.sleep(3000);
+//                    Thread.sleep(2000);
 //                } catch (InterruptedException e) {
 //                    e.printStackTrace();
 //                }
-                out.writeObject("ok");
+                out.println("ok");
             }
             bos.flush();
             fos.close();
-            if (bytesRead < fileSize) cleanUp(file);
-            int chunkSize = is.read(contents);
-            System.out.println(chunkSize);
-            if (chunkSize == 9 && Arrays.equals(Arrays.copyOfRange(contents, 0, 9), "completed".getBytes())) {
-                if (bytesRead == fileSize) {
-                    out.writeObject("file uploaded!");
-                    if (reqId != 0 && fileType.equals("public")) {
-                        for (Request request : requests) {
-                            if (reqId == request.getReqId()) {
-                                for (User user : users) {
-                                    if (user.getId() == request.getSenderId()) {
-                                        user.addUnreadMessage("requested file uploaded!" + "\nfile name: " +
-                                                fileName + "\nuploader id: " + currUser.getId());
-                                        break;
-                                    }
+
+            while (!isReceiveCompleted && !isReceiveInterrupted) ;
+            if (isReceiveCompleted && totalBytesRead == fileSize) {
+                out.println("upload finished!");
+                Hashtable<Integer, FileInfo> table = fileTable.get(currUser.getId());
+                Enumeration<Integer> e = table.keys();
+                while (e.hasMoreElements()) {
+                    if (fileName.equals(table.get(e.nextElement()).getName())) break;
+                }
+                if (!e.hasMoreElements()) table.put(table.size() + 1, new FileInfo(fileName, fileType));
+
+                if (reqId != 0 && fileType.equals("public")) {
+                    for (Request request : requests) {
+                        if (reqId == request.getReqId()) {
+                            for (User user : users) {
+                                if (user.getId() == request.getSenderId()) {
+                                    user.receiveMessage("requested file uploaded!" + "\nfile name: " +
+                                            fileName + "\nuploader id: " + currUser.getId());
+                                    break;
                                 }
-                                break;
                             }
+                            break;
                         }
                     }
-                } else cleanUp(file);
-            }
+                }
+            } else cleanUp(file);
+            isReceiveCompleted = isReceiveInterrupted = false;
         } catch (IOException e) {
             try {
-                if (fos != null) fos.close();
-                cleanUp(file);
+                if (fos != null) {
+                    fos.close();
+                    cleanUp(file);
+                }
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
         }
-        buffer_size -= fileSize;
-    }
-
-    private void sendFileList(String path) throws IOException {
-        File[] files = new File(path).listFiles();
-        if (files != null)
-            for (File file : files) out.writeObject(file.getName());
+        bufferSize -= fileSize;
     }
 
     private void cleanUp(File file) throws IOException {
-        out.writeObject("uploading failed!");
+        out.println("uploading failed!");
         if (!file.delete()) System.out.println("couldn't remove file!");
     }
 }

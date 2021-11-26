@@ -1,9 +1,8 @@
 import java.util.LinkedList;
-import java.util.Queue;
 
 class User {
     private int id;
-    private Queue<String> messages;
+    private LinkedList<String> messages;
     private ServerThread serverThread;
 
     User(int id, ServerThread serverThread) {
@@ -22,18 +21,14 @@ class User {
 
     String showUnreadMessages() {
         StringBuilder allMessages = new StringBuilder();
-        while(!messages.isEmpty()) {
+        while (!messages.isEmpty()) {
             allMessages.append(messages.remove()).append("\n\n");
         }
         return allMessages.toString();
     }
 
-    void addUnreadMessage(String message) {
+    void receiveMessage(String message) {
         messages.add(message);
-    }
-
-    ServerThread getServerThread() {
-        return serverThread;
     }
 
     void setServerThread(ServerThread serverThread) {

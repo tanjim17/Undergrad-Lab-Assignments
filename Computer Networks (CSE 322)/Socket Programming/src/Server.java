@@ -8,8 +8,9 @@ class Server {
         while (true) {
             System.out.println("waiting for connection...");
             Socket socket = serverSocket.accept();
+            Socket fileSocket = serverSocket.accept();
             System.out.println("connection established!");
-            new ServerThread(socket).start();
+            new ServerThread(socket, fileSocket).start();
         }
     }
 }

@@ -4,22 +4,18 @@ public class Request {
     private String description;
     private static int lastReqId = 0;
 
-    public Request(int senderId, String description) {
+    Request(int senderId, String description) {
         reqId = ++lastReqId;
         this.senderId = senderId;
         this.description = description;
     }
 
-    public int getReqId() {
+    int getReqId() {
         return reqId;
     }
 
-    public int getSenderId() {
+    int getSenderId() {
         return senderId;
-    }
-
-    public String getDescription() {
-        return description;
     }
 
     public String toString() {
