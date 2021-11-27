@@ -6,7 +6,7 @@ public class Client {
     public static void main(String[] args) {
         try {
             Socket socket = new Socket("localhost", 1000);
-            socket.setSoTimeout(5000);
+            socket.setSoTimeout(30*1000);
             Socket fileSocket = new Socket("localhost", 1000);
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
             new ClientThread(socket, fileSocket, out).start();

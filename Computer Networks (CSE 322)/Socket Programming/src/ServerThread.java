@@ -14,6 +14,7 @@ class ServerThread extends Thread {
     private Thread receiveThread;
     private volatile boolean isReceiveCompleted;
     private volatile boolean isReceiveInterrupted;
+    private volatile FileOutputStream currFileOutStream;
     private static Hashtable<Integer, Hashtable<Integer, FileInfo>> fileTable = new Hashtable<>();
 
     ServerThread(Socket socket, Socket fileSocket) {
@@ -27,6 +28,7 @@ class ServerThread extends Thread {
         currUser = null;
         receiveThread = null;
         isReceiveCompleted = isReceiveInterrupted = false;
+        currFileOutStream = null;
     }
 
     public void run() {
@@ -42,7 +44,7 @@ class ServerThread extends Thread {
         }
     }
 
-    private void parseMessage(String message) throws IOException {
+    private void parseMessage(String message) {
         String[] data = message.split(" ");
         if (currUser == null) {
             login(data);
@@ -118,21 +120,21 @@ class ServerThread extends Thread {
         }
     }
 
-    private void login(String[] data) throws IOException {
+    private void login(String[] data) {
         if (!data[0].equals("l")) return;
         int id = Integer.parseInt(data[1]);
         for (User user : users) {
             if (user.getId() == id) {
                 if (user.isLoggedIn()) out.println("already logged in!");
                 else {
-                    user.setServerThread(this);
+                    user.setLoginStatus(true);
                     currUser = user;
                     out.println("logged in!");
                 }
                 return;
             }
         }
-        currUser = new User(id, this);
+        currUser = new User(id, true);
         users.add(currUser);
         fileTable.put(id, new Hashtable<>());
         String rootPath = "files/" + data[1];
@@ -145,8 +147,15 @@ class ServerThread extends Thread {
     private void logout() {
         System.out.println(currUser.getId() + " disconnected!");
         out.println("logged out!");
-        currUser.setServerThread(null);
+        currUser.setLoginStatus(false);
         currUser = null;
+        if(currFileOutStream != null) { //logout in the middle of file transfer
+            try {
+                currFileOutStream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     private void sendFile(File file) {
@@ -174,6 +183,7 @@ class ServerThread extends Thread {
         FileOutputStream fos = null;
         try {
             fos = new FileOutputStream(file);
+            currFileOutStream = fos;
             BufferedOutputStream bos = new BufferedOutputStream(fos);
             InputStream is = fileSocket.getInputStream();
 
@@ -188,7 +198,7 @@ class ServerThread extends Thread {
                 bos.write(contents, 0, bytesRead);
                 totalBytesRead += bytesRead;
 //                try {
-//                    Thread.sleep(2000);
+//                    Thread.sleep(31*1000);
 //                } catch (InterruptedException e) {
 //                    e.printStackTrace();
 //                }
@@ -234,10 +244,11 @@ class ServerThread extends Thread {
             }
         }
         bufferSize -= fileSize;
+        currFileOutStream = null;
     }
 
-    private void cleanUp(File file) throws IOException {
-        out.println("uploading failed!");
+    private void cleanUp(File file) {
+        out.println("upload failed!");
         if (!file.delete()) System.out.println("couldn't remove file!");
     }
 }

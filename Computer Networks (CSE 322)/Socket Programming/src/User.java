@@ -3,12 +3,12 @@ import java.util.LinkedList;
 class User {
     private int id;
     private LinkedList<String> messages;
-    private ServerThread serverThread;
+    private boolean loginStatus;
 
-    User(int id, ServerThread serverThread) {
+    User(int id, boolean loginStatus) {
         this.id = id;
         messages = new LinkedList<>();
-        this.serverThread = serverThread;
+        this.loginStatus = loginStatus;
     }
 
     int getId() {
@@ -16,7 +16,7 @@ class User {
     }
 
     boolean isLoggedIn() {
-        return serverThread != null;
+        return loginStatus;
     }
 
     String showUnreadMessages() {
@@ -31,7 +31,7 @@ class User {
         messages.add(message);
     }
 
-    void setServerThread(ServerThread serverThread) {
-        this.serverThread = serverThread;
+    void setLoginStatus(boolean loginStatus) {
+        this.loginStatus = loginStatus;
     }
 }
