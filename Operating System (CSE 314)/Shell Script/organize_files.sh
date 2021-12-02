@@ -50,8 +50,8 @@ organize() {
         if [ ! -f "$dest/$filename" ]; then
             cp "$path" "$dest"
             echo $path >> "$dest/desc_$subdir.txt"
+            count["$subdir"]=$((${count["$subdir"]} + 1))
         fi
-        count["$subdir"]=$((${count["$subdir"]} + 1))
     done
 
     echo "file_type,no_of_files" > output.csv
