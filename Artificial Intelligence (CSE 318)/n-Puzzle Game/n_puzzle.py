@@ -14,7 +14,7 @@ class Node:
     def __lt__(self, other):
         return self.expected_cost < other.expected_cost
 
-    def create_neighbor_nodes(self, explored_boards):
+    def create_neighbor_nodes(self, expanded_boards):
         x, y = get_blank_pos(self.board)
         new_positions = [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)]
         nodes = []
@@ -23,7 +23,7 @@ class Node:
             if 0 <= new_x < size and 0 <= new_y < size:
                 new_board = np.copy(self.board)
                 new_board[x][y], new_board[new_x][new_y] = new_board[new_x][new_y], new_board[x][y]
-                if new_board.tobytes() in explored_boards:
+                if new_board.tobytes() in expanded_boards:
                     continue
                 nodes.append(Node(new_board, self, self.cost_from_start + 1))
         return nodes
@@ -106,7 +106,9 @@ def print_path(node):
         print(node)
 
 
-heuristics = [Node.get_hamming_dist, Node.get_manhattan_dist, Node.get_manhattan_dist_with_linear_conflict]
+heuristics = {"hamming distance": Node.get_hamming_dist,
+              "manhattan distance": Node.get_manhattan_dist,
+              "manhattan distance with linear conflict": Node.get_manhattan_dist_with_linear_conflict}
 
 
 def solve_puzzle(board, heuristic):
@@ -116,23 +118,21 @@ def solve_puzzle(board, heuristic):
 
     pq = PriorityQueue()
     pq.put(Node(board))
-    expanded_nodes_count = 1
+    explored_nodes_count = 1
 
-    # explored_boards = []
-    explored_boards = set()
-    explored_boards.add(board.tobytes())
+    expanded_boards = set()
     while True:
         node = pq.get()
         if np.array_equal(node.board, goal_board):
             print_path(node)
-            print("# of explored nodes: " + str(len(explored_boards)))
-            print("# of expanded nodes: " + str(expanded_nodes_count))
+            print("# of expanded nodes: " + str(len(expanded_boards)))
+            print("# of explored nodes: " + str(explored_nodes_count))
             print("Optimal cost: " + str(node.cost_from_start))
             break
-        for neighbor_node in node.create_neighbor_nodes(explored_boards):
+        for neighbor_node in node.create_neighbor_nodes(expanded_boards):
             pq.put(neighbor_node)
-            expanded_nodes_count += 1
-        explored_boards.add(node.board.tobytes())
+            explored_nodes_count += 1
+        expanded_boards.add(node.board.tobytes())
 
 
 def main():
@@ -148,8 +148,9 @@ def main():
         print("not solvable!")
         return
 
-    for heuristic in heuristics:
-        solve_puzzle(board, heuristic)
+    for heuristic in heuristics.items():
+        print("\n" + heuristic[0] + ":")
+        solve_puzzle(board, heuristic[1])
 
 
 if __name__ == "__main__":
