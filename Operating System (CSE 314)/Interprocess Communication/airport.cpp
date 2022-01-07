@@ -177,7 +177,7 @@ int main() {
  	mt19937 rng(rd());
 	for (int i = 0; i < psngr_count; i++) {
 		double inter_arrival_time =  exp_dist.operator()(rng);
-		sleep(inter_arrival_time);
+		sleep(round(inter_arrival_time));
 		pair<int, bool>* psngr_info = new pair<int, bool>({id++, bernouli_dist_for_vip(generator)});
 		pthread_create(new pthread_t, NULL, psngr_activity, (void*)psngr_info);
 	}
