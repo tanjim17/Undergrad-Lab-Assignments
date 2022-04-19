@@ -1,5 +1,4 @@
-workspace.xml
-uiDesigner.xml
 out/
 env/
 __pycache__/
+.idea/
