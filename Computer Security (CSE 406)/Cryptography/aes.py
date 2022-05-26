@@ -1,9 +1,7 @@
-from ctypes.wintypes import WORD
 from BitVector import *
-import time
 
 WORD_LEN = 4 # 4 bytes 
-AES_modulus = BitVector(bitstring='100011011')
+AES_MODULUS = BitVector(bitstring='100011011')
 
 Sbox = (
     0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
@@ -58,27 +56,6 @@ InvMixer = [
 ]
 
 roundkeys = []
-key_scheduling_time = 0
-encryption_time = 0
-decryption_time = 0
-
-# defining auxiliary functions
-def input_key():
-    key = 'Thats my Kung Fu'
-    # key = input('Enter key: ')
-    if len(key) > 16:
-        key = key[0:16]
-    elif len(key) < 16:
-        key = key + ' ' * (16 - len(key))
-    roundkeys.append(BitVector(textstring=key))
-
-def input_plaintext():
-    file = open('input.txt', 'r')
-    plaintext = file.read()
-    file.close()
-    if len(plaintext) % 16 != 0:
-        plaintext = plaintext + ' ' * (16 - len(plaintext) % 16)
-    return BitVector(textstring=plaintext)
 
 def convert_bitvector_to_matrix(bitvector):
     state_matrix = []
@@ -102,29 +79,22 @@ def g(word, rc):
     word = word ^ rc
     return word
 
-def schedule_roundkeys():
-    global AES_modulus
+def schedule_roundkeys(initial_roundkey):
+    roundkeys.append(initial_roundkey)
     rc = BitVector(hexstring="01")
     for i in range(10):
         rcon = rc
         rcon += BitVector(hexstring="000000")
-
-        w0 = roundkeys[i][0: 32] ^ g(roundkeys[i][96:128], rcon)
-        w1 = w0 ^ roundkeys[i][32: 64]
-        w2 = w1 ^ roundkeys[i][64: 96]
-        w3 = w2 ^ roundkeys[i][96: 128]
-
+        w0 = roundkeys[i][0:32] ^ g(roundkeys[i][96:128], rcon)
+        w1 = w0 ^ roundkeys[i][32:64]
+        w2 = w1 ^ roundkeys[i][64:96]
+        w3 = w2 ^ roundkeys[i][96:128]
         new_roundkey = w0
         new_roundkey += w1
         new_roundkey += w2
         new_roundkey += w3
         roundkeys.append(new_roundkey)
-        
-        # prev_rc = rc
-        # rc = BitVector(hexstring="02").gf_multiply(prev_rc)
-        # if prev_rc >= BitVector(hexstring='80'):
-        #     rc ^= BitVector(hexstring='11b')
-        rc = BitVector(hexstring='02').gf_multiply_modular(rc, AES_modulus, 8)
+        rc = BitVector(hexstring='02').gf_multiply_modular(rc, AES_MODULUS, 8)
 
 def sub_bytes(bitvector, sBox):
     new_bitvector = BitVector(size=0)
@@ -147,99 +117,27 @@ def mix_col(bitvector, mixer):
         for j in range(len(state[0])):
             entry = BitVector(hexstring='00')
             for k in range(len(state)):
-                entry ^= mixer[i][k].gf_multiply_modular(state[k][j], AES_modulus, 8)
+                entry ^= mixer[i][k].gf_multiply_modular(state[k][j], AES_MODULUS, 8)
             row.append(entry)
         new_state.append(row)
     return convert_matrix_to_bitvector(new_state)
 
-def encrypt(bitvector, is_debug):
+def encrypt(bitvector):
     # round 0
     bitvector = bitvector ^ roundkeys[0]
-    if is_debug:
-        print("AES output after round {}: {}".format(0, bitvector.get_bitvector_in_hex()))
-
     # round 1-9
     for i in range(1, 10):
         bitvector = mix_col(shift_rows(sub_bytes(bitvector, Sbox), False), Mixer) ^ roundkeys[i]
-        if is_debug:
-            print("AES output after round {}: {}".format(i, bitvector.get_bitvector_in_hex()))
-
     # round 10
     bitvector = shift_rows(sub_bytes(bitvector, Sbox), False) ^ roundkeys[10]
-    if is_debug:
-        print("AES output after round {}: {}".format(10, bitvector.get_bitvector_in_hex()))
-
     return bitvector
 
-def decrypt(bitvector, is_debug):
+def decrypt(bitvector):
     # round 0
     bitvector = bitvector ^ roundkeys[10]
-    if is_debug:
-        print("Decryption output after round {}: {}".format(0, bitvector.get_bitvector_in_hex()))
-
     # round 1-9
     for i in range(1, 10):
         bitvector = mix_col(sub_bytes(shift_rows(bitvector, True), InvSbox) ^ roundkeys[10 - i], InvMixer)
-        if is_debug:
-            print("Decryption output after round {}: {}".format(i, bitvector.get_bitvector_in_hex()))
-
     # round 10
     bitvector = sub_bytes(shift_rows(bitvector, True), InvSbox) ^ roundkeys[0]
-    if is_debug:
-        print("Decryption output after round {}: {}".format(10, bitvector.get_bitvector_in_hex()))
-
     return bitvector
-
-is_debug = True
-
-# key scheduling
-input_key()
-key_scheduling_time = time.time()
-schedule_roundkeys()
-key_scheduling_time = time.time() - key_scheduling_time
-# print("Scheduled roundkeys:")
-# for i in range(len(roundkeys)):
-#     print("Roundkey {}: {}".format(i, roundkeys[i].get_bitvector_in_hex()))
-
-# encryption
-plaintext = input_plaintext()
-ciphertext = BitVector(size=0)
-encryption_time = time.time()
-for i in range(len(plaintext) // 128):
-    ciphertext += encrypt(plaintext[i * 128: i * 128 + 128], is_debug)
-encryption_time = time.time() - encryption_time
-
-# decryption
-deciphered_output = BitVector(size=0)
-decryption_time = time.time()
-for i in range(len(ciphertext) // 128):
-    deciphered_output += decrypt(ciphertext[i * 128: i * 128 + 128], is_debug)
-decryption_time = time.time() - decryption_time        
-if is_debug:
-    print("Deciphered output: {}".format(deciphered_output.get_bitvector_in_ascii()))
-
-# def generate_report(is_text_input):
-#     # reporting initial roundkey
-#     print("\nInitial roundkey [in ASCII]: {}".format(roundkeys[0].get_bitvector_in_ascii()))
-#     print("Initial roundkey [in Hex]: {}\n".format(roundkeys[0].get_bitvector_in_hex()))
-
-#     # reporting plaintext
-#     if is_text_input:
-#         print("Plaintext [in ASCII]: {}".format(AES_input.get_bitvector_in_ascii()[: len(AES_input.get_bitvector_in_ascii()) - pad_count_input]))
-#         print("Plaintext [in Hex]: {}\n".format(AES_input.get_bitvector_in_hex()[: len(AES_input.get_bitvector_in_hex()) - 2*pad_count_input]))
-
-#     # reporting ciphertext
-#     if is_text_input:
-#         print("Ciphertext [in ASCII]: {}".format(AES_output.get_bitvector_in_ascii()))
-#         print("Ciphertext [in Hex]: {}\n".format(AES_output.get_bitvector_in_hex()))
-
-#     # reporting deciphertext
-#     if is_text_input:
-#         print("Deciphered text [in ASCII]: {}".format(decipher_output.get_bitvector_in_ascii()[: len(decipher_output.get_bitvector_in_ascii()) - pad_count_input]))
-#         print("Deciphered text [in Hex]: {}\n".format(decipher_output.get_bitvector_in_hex()[: len(decipher_output.get_bitvector_in_hex()) - 2*pad_count_input]))
-
-#     # reporting execution time
-#     print("<Execution time>")
-#     print("Key scheduling time: {} seconds".format(key_scheduling_time))
-#     print("Encryption time: {} seconds".format(encryption_time))
-#     print("Decryption time: {} seconds".format(decryption_time))
