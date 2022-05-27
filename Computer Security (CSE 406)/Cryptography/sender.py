@@ -8,8 +8,8 @@ PORT = 12345
 with socket.socket() as s:
     s.connect((HOST, PORT))
     while True:
-        # filepath = input('Enter file path: ')
-        filepath = 'input.txt'
+        # file input
+        filepath = input('Enter file path: ')
         basename = os.path.basename(filepath)
         filename, extension = basename.split('.')
         pad_count = 0
@@ -18,27 +18,36 @@ with socket.socket() as s:
                 plaintext = f.read()
             if (len(plaintext) % 16) != 0:
                 pad_count = 16 - len(plaintext) % 16
-                plaintext = plaintext + ' ' * pad_count
-                plaintext_bv = BitVector(textstring=plaintext)
+                plaintext = plaintext + '0' * pad_count
+            plaintext_bv = BitVector(textstring=plaintext)
         else:
             with open(filepath, 'rb') as f:
                 plaintext = bytes.hex(f.read())
             if (len(plaintext) % 32) != 0:
                 pad_count = 32 - len(plaintext) % 32
-                plaintext = plaintext + ' ' * pad_count
-                plaintext_bv = BitVector(hexstring=plaintext)
+                plaintext = plaintext + '0' * pad_count
+            plaintext_bv = BitVector(hexstring=plaintext)
 
-        aes_key = 'BUET CSE17 Batch'
-        schedule_roundkeys(BitVector(textstring=aes_key))
+        # input key
+        aes_key = input('Enter AES key: ')
+        if len(aes_key) > 16:
+            aes_key = aes_key[0:16]
+        elif len(aes_key) < 16:
+            aes_key = aes_key + ' ' * (16 - len(aes_key))
+        key_bv = BitVector(textstring=aes_key)
 
+        # input k for RSA
+        k = int(input('Enter value of k for RSA: '))
+        
         # plaintext encryption
+        schedule_roundkeys(BitVector(textstring=aes_key))
         ciphertext_bv = BitVector(size=0)
-        for i in range(len(plaintext_bv) // 128):
-            print('a', i)
-            ciphertext_bv += encrypt(plaintext_bv[i * 128: i * 128 + 128])
+        for i in range(plaintext_bv.length() // 128):
+            ciphertext_bv += encrypt(plaintext_bv[i * 128: (i + 1) * 128])
+            print('encrypted: {}B/{}B'.format((i + 1) * 16, plaintext_bv.length() // 8))
 
         # aes key encryption
-        e, d, n = generate_key_pair(16)
+        e, d, n = generate_key_pair(k)
         with open('./Don\'t Open This/privatekey.txt', 'w') as f:
             f.write(str([d, n]))
         ciphered_aes_key = []
@@ -53,19 +62,5 @@ with socket.socket() as s:
         s.sendall(str([e, n]).encode())
         s.recv(8192)
         s.sendall((str(pad_count) + ',' + extension).encode())
-
-        # # decryption
-        # deciphered_text_bv = BitVector(size=0)
-        # for i in range(len(ciphertext_bv) // 128):
-        #     print('b', i)
-        #     deciphered_text_bv += decrypt(ciphertext_bv[i * 128: i * 128 + 128])
-
-        # # output non-text file
-        # if extension != 'txt':
-        #     file = open('./output/' + basename, "wb+")
-        #     file.write(bytes.fromhex(deciphered_text_bv.get_bitvector_in_hex()[:len(
-        #         deciphered_text_bv.get_bitvector_in_hex()) - pad_count]))
-        #     file.close()
-
-        #print(deciphered_text_bv.get_bitvector_in_ascii())
         break
+print('File sent.')

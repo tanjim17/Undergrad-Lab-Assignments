@@ -2,20 +2,14 @@ from rsa import *
 import time
 from prettytable import PrettyTable
 
-# input k
-k = 16
-# k = int(input('Enter value of k: '))
+time_info = PrettyTable(['K', 'Key Generation', 'Encryption', 'Decryption'])
 
 # input plaintext
-plaintext = 'CanTheyDoTheirFest'
-# plaintext = input('Enter plaintext: ')
-
-time_info = PrettyTable(['K', 'Key Generation', 'Encryption', 'Decryption'])
+plaintext = input('Enter plaintext: ')
 
 # time count
 for k in [16, 32, 64, 128]:
     # key generation
-    # e_bv, d_bv, n_bv = generate_key_pair(k)
     key_generation_time = time.perf_counter()
     e, d, n = generate_key_pair(k)
     key_generation_time = time.perf_counter() - key_generation_time
@@ -40,8 +34,8 @@ for k in [16, 32, 64, 128]:
     print('Plain Text:', plaintext)
     print('Cipher:', cipher)
     print('Deciphered Text:', deciphered_text, '\n')
-    time_info.add_row([k, '{:.4e}'.format(key_generation_time), '{:.4e}'.format(encryption_time),
-                       '{:.4e}'.format(decryption_time)])
+    time_info.add_row([k, '{:.5e}'.format(key_generation_time), '{:.5e}'.format(encryption_time),
+        '{:.5e}'.format(decryption_time)])
 
 print('Time Info (in seconds):')
 print(time_info)

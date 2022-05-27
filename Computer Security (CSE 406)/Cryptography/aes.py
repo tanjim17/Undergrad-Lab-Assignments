@@ -2,6 +2,7 @@ from BitVector import *
 
 WORD_LEN = 4 # 4 bytes 
 AES_MODULUS = BitVector(bitstring='100011011')
+NO_OF_ROUND = 10
 
 Sbox = (
     0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
@@ -57,34 +58,34 @@ InvMixer = [
 
 roundkeys = []
 
-def convert_bitvector_to_matrix(bitvector):
-    state_matrix = []
+def convert_bitvector_to_matrix(bv):
+    matrix = []
     for i in range(WORD_LEN):
         row = []
-        for j in range(bitvector.length() // (8 * WORD_LEN)):
-            row.append(bitvector[(i * 8 + j * 32): (i * 8 + j * 32) + 8])
-        state_matrix.append(row)
-    return state_matrix
+        for j in range(bv.length() // (8 * WORD_LEN)):
+            row.append(bv[i * 8 + j * 32: (i + 1) * 8 + j * 32])
+        matrix.append(row)
+    return matrix
 
-def convert_matrix_to_bitvector(state_matrix):
-    bitvector = BitVector(size=0)
-    for j in range(len(state_matrix[0])):
-        for i in range(len(state_matrix)):
-            bitvector += state_matrix[i][j]
-    return bitvector
+def convert_matrix_to_bitvector(matrix):
+    bv = BitVector(size=0)
+    for j in range(len(matrix[0])):
+        for i in range(len(matrix)):
+            bv += matrix[i][j]
+    return bv
 
-def g(word, rc):
-    word = word << 8
-    word = sub_bytes(word, Sbox)
-    word = word ^ rc
-    return word
+def g(bv, rc):
+    bv = bv << 8
+    bv = sub_bytes(bv, Sbox)
+    bv = bv ^ rc
+    return bv
 
 def schedule_roundkeys(initial_roundkey):
     roundkeys.append(initial_roundkey)
-    rc = BitVector(hexstring="01")
-    for i in range(10):
+    rc = BitVector(hexstring='01')
+    for i in range(NO_OF_ROUND):
         rcon = rc
-        rcon += BitVector(hexstring="000000")
+        rcon += BitVector(hexstring='000000')
         w0 = roundkeys[i][0:32] ^ g(roundkeys[i][96:128], rcon)
         w1 = w0 ^ roundkeys[i][32:64]
         w2 = w1 ^ roundkeys[i][64:96]
@@ -96,21 +97,21 @@ def schedule_roundkeys(initial_roundkey):
         roundkeys.append(new_roundkey)
         rc = BitVector(hexstring='02').gf_multiply_modular(rc, AES_MODULUS, 8)
 
-def sub_bytes(bitvector, sBox):
-    new_bitvector = BitVector(size=0)
-    for i in range(0, bitvector.length(), 8):
-        new_bitvector += BitVector(intVal=sBox[bitvector[i: i+8].intValue()], size=8)
-    return new_bitvector
+def sub_bytes(bv, sBox):
+    new_bv = BitVector(size=0)
+    for i in range(0, bv.length(), 8):
+        new_bv += BitVector(intVal=sBox[bv[i: i+8].intValue()], size=8)
+    return new_bv
 
-def shift_rows(bitvector, isInverse):
-    state_matrix = convert_bitvector_to_matrix(bitvector)
+def shift_rows(bv, isInverse):
+    state = convert_bitvector_to_matrix(bv)
     for i in range(WORD_LEN):
-        shift_idx = len(state_matrix[i]) - i if isInverse else i 
-        state_matrix[i] = state_matrix[i][shift_idx:] + state_matrix[i][:shift_idx]
-    return convert_matrix_to_bitvector(state_matrix)
+        shift_idx = len(state[0]) - i if isInverse else i 
+        state[i] = state[i][shift_idx:] + state[i][:shift_idx]
+    return convert_matrix_to_bitvector(state)
 
-def mix_col(bitvector, mixer):
-    state = convert_bitvector_to_matrix(bitvector)
+def mix_col(bv, mixer):
+    state = convert_bitvector_to_matrix(bv)
     new_state = []
     for i in range(len(mixer)):
         row = []
@@ -122,22 +123,22 @@ def mix_col(bitvector, mixer):
         new_state.append(row)
     return convert_matrix_to_bitvector(new_state)
 
-def encrypt(bitvector):
+def encrypt(bv):
     # round 0
-    bitvector = bitvector ^ roundkeys[0]
+    bv = bv ^ roundkeys[0]
     # round 1-9
     for i in range(1, 10):
-        bitvector = mix_col(shift_rows(sub_bytes(bitvector, Sbox), False), Mixer) ^ roundkeys[i]
+        bv = mix_col(shift_rows(sub_bytes(bv, Sbox), False), Mixer) ^ roundkeys[i]
     # round 10
-    bitvector = shift_rows(sub_bytes(bitvector, Sbox), False) ^ roundkeys[10]
-    return bitvector
+    bv = shift_rows(sub_bytes(bv, Sbox), False) ^ roundkeys[10]
+    return bv
 
-def decrypt(bitvector):
+def decrypt(bv):
     # round 0
-    bitvector = bitvector ^ roundkeys[10]
+    bv = bv ^ roundkeys[10]
     # round 1-9
     for i in range(1, 10):
-        bitvector = mix_col(sub_bytes(shift_rows(bitvector, True), InvSbox) ^ roundkeys[10 - i], InvMixer)
+        bv = mix_col(sub_bytes(shift_rows(bv, True), InvSbox) ^ roundkeys[10 - i], InvMixer)
     # round 10
-    bitvector = sub_bytes(shift_rows(bitvector, True), InvSbox) ^ roundkeys[0]
-    return bitvector
+    bv = sub_bytes(shift_rows(bv, True), InvSbox) ^ roundkeys[0]
+    return bv
