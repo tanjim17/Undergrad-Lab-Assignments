@@ -22,23 +22,23 @@ elif len(key) < 16:
 
 # key scheduling
 key_bv = BitVector(textstring=key)
-key_scheduling_time = time.time()
+key_scheduling_time = time.perf_counter()
 schedule_roundkeys(key_bv)
-key_scheduling_time = time.time() - key_scheduling_time
+key_scheduling_time = time.perf_counter() - key_scheduling_time
 
 # encryption
 ciphertext_bv = BitVector(size=0)
-encryption_time = time.time()
+encryption_time = time.perf_counter()
 for i in range(len(plaintext_bv) // 128):
     ciphertext_bv += encrypt(plaintext_bv[i * 128: i * 128 + 128])
-encryption_time = time.time() - encryption_time
+encryption_time = time.perf_counter() - encryption_time
 
 # decryption
 deciphered_text_bv = BitVector(size=0)
-decryption_time = time.time()
+decryption_time = time.perf_counter()
 for i in range(len(ciphertext_bv) // 128):
     deciphered_text_bv += decrypt(ciphertext_bv[i * 128: i * 128 + 128])
-decryption_time = time.time() - decryption_time
+decryption_time = time.perf_counter() - decryption_time
 
 print_text('Plain Text', plaintext_bv)
 print_text('Key', key_bv)
