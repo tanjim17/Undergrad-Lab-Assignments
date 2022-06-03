@@ -6,22 +6,19 @@
 
 #define pi (2 * acos(0.0))
 
-const double ROTATION_ANGLE = 3 * pi / 180; // radian
-const double TRANSLATION_AMOUNT = 2;
-const int STACK_COUNT = 25;
-const int SLICE_COUNT = 25;
-const double SIDE = 60;
-
-double cameraHeight, cameraAngle;
-int drawaxes;
-double radius, side;
-
 struct point
 {
 	double x,y,z;
 };
 typedef point vect;
 
+const double ROTATION_ANGLE = 3 * pi / 180;
+const double TRANSLATION_AMOUNT = 2;
+const int STACK_COUNT = 25;
+const int SLICE_COUNT = 25;
+const double SIDE = 60;
+
+double radius, side;
 point pos;
 vect u, r, l;
 
@@ -45,19 +42,17 @@ vect rotate_(vect v, vect perp_v, double angle) {
 }
 
 void drawAxes() {
-	if(drawaxes==1) {
-		glColor3f(1.0, 1.0, 1.0);
-		glBegin(GL_LINES); {
-			glVertex3f( 100,0,0);
-			glVertex3f(-100,0,0);
+    glColor3f(1.0, 1.0, 1.0);
+    glBegin(GL_LINES); {
+        glVertex3f( 100,0,0);
+        glVertex3f(-100,0,0);
 
-			glVertex3f(0,-100,0);
-			glVertex3f(0, 100,0);
+        glVertex3f(0,-100,0);
+        glVertex3f(0, 100,0);
 
-			glVertex3f(0,0, 100);
-			glVertex3f(0,0,-100);
-		} glEnd();
-	}
+        glVertex3f(0,0, 100);
+        glVertex3f(0,0,-100);
+    } glEnd();
 }
 
 void drawSquare(double a) {
@@ -98,9 +93,7 @@ void drawCylinderSlice(double radius, double height) {
     double angle;
     for (int i = 0; i < SLICE_COUNT; i++) {
         angle = (i / (double)SLICE_COUNT) * pi / 2;
-        p[i].x = radius * cos(angle);
-        p[i].y = radius * sin(angle);
-        p[i].z = height;
+        p[i] = {radius * cos(angle), radius * sin(angle), height};
     }
     for (int i = 0; i < SLICE_COUNT - 1; i++) {
         glBegin(GL_QUADS); {
@@ -140,14 +133,14 @@ void drawSphereCube(double radius) {
 
     /** draw 1/4 of cylinder **/
     glColor3f(0, 1, 0);
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 4; i++) { // along z-axis
         glPushMatrix();
         glTranslatef(corners[i].x, corners[i].y, 0);
         glRotatef(90 * i, 0, 0, 1);
         drawCylinderSlice(radius, sideHalf);
         glPopMatrix();
     }
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 4; i++) { // along y-axis
         glPushMatrix();
         glRotatef(90, 1, 0, 0);
         glTranslatef(corners[i].x, corners[i].y, 0);
@@ -155,7 +148,7 @@ void drawSphereCube(double radius) {
         drawCylinderSlice(radius, sideHalf);
         glPopMatrix();
     }
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 4; i++) { // along x-axis
         glPushMatrix();
         glRotatef(90, 0, 1, 0);
         glTranslatef(corners[i].x, corners[i].y, 0);
@@ -167,23 +160,23 @@ void drawSphereCube(double radius) {
     /** draw square **/
     glColor3f(1, 1, 1);
     glPushMatrix() ;
-    glTranslatef(0, 0, sideHalf);
+    glTranslatef(0, 0, SIDE / 2);
     drawSquare(sideHalf); // top
-    glTranslatef(0, 0, -side);
+    glTranslatef(0, 0, -SIDE);
     drawSquare(sideHalf); // bottom
     glPopMatrix();
     for (int i = 0 ; i < 4; i++) { // lateral
         glPushMatrix();
         glRotatef(90 * i, 0, 0, 1);
-        glTranslatef(sideHalf, 0, 0);
+        glTranslatef(SIDE / 2, 0, 0);
         glRotatef(90, 0, 1, 0);
         drawSquare(sideHalf);
         glPopMatrix();
     }
 }
 
-void keyboardListener(unsigned char key, int x,int y){
-	switch(key){
+void keyboardListener(unsigned char key, int x,int y) {
+	switch(key) {
         case '1':
             r = rotate_(r, u, ROTATION_ANGLE);
             l = rotate_(l, u, ROTATION_ANGLE);
@@ -214,8 +207,8 @@ void keyboardListener(unsigned char key, int x,int y){
 }
 
 
-void specialKeyListener(int key, int x,int y){
-	switch(key){
+void specialKeyListener(int key, int x,int y) {
+	switch(key) {
 	    case GLUT_KEY_UP:
             pos = sum(pos, scale(l, TRANSLATION_AMOUNT));
 			break;
@@ -245,29 +238,7 @@ void specialKeyListener(int key, int x,int y){
 	}
 }
 
-void mouseListener(int button, int state, int x, int y){	//x, y is the x-y of the screen (2D)
-	switch(button){
-		case GLUT_LEFT_BUTTON:
-			if(state == GLUT_DOWN){		// 2 times?? in ONE click? -- solution is checking DOWN or UP
-				drawaxes=1-drawaxes;
-			}
-			break;
-
-		case GLUT_RIGHT_BUTTON:
-			//........
-			break;
-
-		case GLUT_MIDDLE_BUTTON:
-			//........
-			break;
-
-		default:
-			break;
-	}
-}
-
-void display(){
-
+void display() {
 	//clear the display
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glClearColor(0,0,0,0);	//color black
@@ -289,10 +260,8 @@ void display(){
 	point target = sum(pos, l);
 	gluLookAt(pos.x,pos.y,pos.z, target.x,target.y,target.z, u.x,u.y,u.z);
 
-
 	//again select MODEL-VIEW
 	glMatrixMode(GL_MODELVIEW);
-
 
 	/****************************
 	/ Add your objects from here
@@ -305,19 +274,14 @@ void display(){
 	glutSwapBuffers();
 }
 
-
-void animate(){
+void animate() {
 	//codes for any changes in Models, Camera
 	glutPostRedisplay();
 }
 
-void init(){
+void init() {
 	//codes for initialization
-	drawaxes = 1;
-	cameraHeight = 150.0;
-	cameraAngle = 1.0;
 	radius = 15;
-	side = 60;
 	pos = {100, 100, 0};
 	u = {0, 0, 1};
 	r = {-1/sqrt(2), 1/sqrt(2), 0};
@@ -343,7 +307,7 @@ void init(){
 	//far distance
 }
 
-int main(int argc, char **argv){
+int main(int argc, char **argv) {
 	glutInit(&argc,argv);
 	glutInitWindowSize(500, 500);
 	glutInitWindowPosition(0, 0);
@@ -360,7 +324,6 @@ int main(int argc, char **argv){
 
 	glutKeyboardFunc(keyboardListener);
 	glutSpecialFunc(specialKeyListener);
-	glutMouseFunc(mouseListener);
 
 	glutMainLoop();		//The main loop of OpenGL
 
