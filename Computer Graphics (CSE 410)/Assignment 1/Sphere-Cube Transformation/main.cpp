@@ -65,19 +65,19 @@ void drawSquare(double a) {
 }
 
 void drawSphereSlice(double radius) {
-    point p[STACK_COUNT][SLICE_COUNT];
+    point p[STACK_COUNT + 1][SLICE_COUNT + 1];
     double h, r, angle;
-    for (int i = 0; i < STACK_COUNT; i++) {
+    for (int i = 0; i < STACK_COUNT + 1; i++) {
         angle = (i / (double)STACK_COUNT) * pi / 2;
         r = radius * cos(angle);
         h = radius * sin(angle);
-        for (int j = 0; j < SLICE_COUNT; j++) {
+        for (int j = 0; j < SLICE_COUNT + 1; j++) {
             angle = (j / (double)SLICE_COUNT) * pi / 2;
             p[i][j] = {r * cos(angle), r * sin(angle), h};
         }
     }
-    for (int i = 0; i < STACK_COUNT - 1; i++) {
-        for (int j = 0; j < SLICE_COUNT - 1; j++) {
+    for (int i = 0; i < STACK_COUNT; i++) {
+        for (int j = 0; j < SLICE_COUNT; j++) {
             glBegin(GL_QUADS); {
                 glVertex3f(p[i][j].x, p[i][j].y, p[i][j].z);
                 glVertex3f(p[i][j + 1].x, p[i][j + 1].y, p[i][j + 1].z);
@@ -89,13 +89,13 @@ void drawSphereSlice(double radius) {
 }
 
 void drawCylinderSlice(double radius, double height) {
-    point p[SLICE_COUNT];
+    point p[SLICE_COUNT + 1];
     double angle;
-    for (int i = 0; i < SLICE_COUNT; i++) {
+    for (int i = 0; i < SLICE_COUNT + 1; i++) {
         angle = (i / (double)SLICE_COUNT) * pi / 2;
         p[i] = {radius * cos(angle), radius * sin(angle), height};
     }
-    for (int i = 0; i < SLICE_COUNT - 1; i++) {
+    for (int i = 0; i < SLICE_COUNT; i++) {
         glBegin(GL_QUADS); {
             glVertex3f(p[i].x, p[i].y, p[i].z);
             glVertex3f(p[i + 1].x, p[i + 1].y, p[i + 1].z);
