@@ -18,7 +18,7 @@ const int STACK_COUNT = 25;
 const int SLICE_COUNT = 25;
 const double SIDE = 60;
 
-double radius, side;
+double radius;
 point pos;
 vect u, r, l;
 
@@ -162,7 +162,9 @@ void drawSphereCube(double radius) {
     glPushMatrix() ;
     glTranslatef(0, 0, SIDE / 2);
     drawSquare(sideHalf); // top
-    glTranslatef(0, 0, -SIDE);
+    glPopMatrix();
+    glPushMatrix() ;
+    glTranslatef(0, 0, -SIDE / 2);
     drawSquare(sideHalf); // bottom
     glPopMatrix();
     for (int i = 0 ; i < 4; i++) { // lateral

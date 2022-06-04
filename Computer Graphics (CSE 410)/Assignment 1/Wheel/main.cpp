@@ -49,13 +49,6 @@ void drawWheel(double radius, double height, int sliceCount) {
         p[i] = {radius * cos(angle), radius * sin(angle), height / 2};
     }
 
-    glPushMatrix() ;
-    glTranslatef(0, 0, radius);
-    glTranslatef(center.x, center.y, center.z) ;
-    glRotatef(rotationAngle, 0, 0, 1) ;
-    glRotatef(distanceTravelled * (360 / (2 * pi * radius)), 0, 1, 0) ;
-    glRotatef(90, 1, 0, 0) ;
-
     /** draw rim of wheel **/
     for (int i = 0; i < sliceCount; i++) {
         if (i % 2) glColor3f(0.6, 0.6, 0.6);
@@ -78,7 +71,6 @@ void drawWheel(double radius, double height, int sliceCount) {
             glVertex3f(spokePoints[i].x, spokePoints[i].y, -spokePoints[i].z) ;
         } glEnd();
     }
-    glPopMatrix();
 }
 
 void keyboardListener(unsigned char key, int x,int y) {
@@ -155,6 +147,10 @@ void display() {
 	****************************/
 	//add objects
 	drawGrid();
+	glTranslatef(center.x, center.y, RADIUS);
+    glRotatef(rotationAngle, 0, 0, 1) ;
+    glRotatef(distanceTravelled * (360 / (2 * pi * RADIUS)), 0, 1, 0);
+    glRotatef(90, 1, 0, 0);
 	drawWheel(RADIUS, HEIGHT, SLICE_COUNT);
 
 	//ADD this line in the end --- if you use double buffer (i.e. GL_DOUBLE)
