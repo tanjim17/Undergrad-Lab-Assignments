@@ -4,6 +4,7 @@
 using namespace std;
 typedef vector<double> vect;
 typedef vector<vect> matrix;
+typedef vector<vector<vector<int>>> colorMatrix;
 
 void printMatrix(matrix m) {
     for(int i = 0; i < m.size(); i++) {
@@ -82,8 +83,8 @@ void normalize(vect& v) {
 }
 
 matrix multiplyMatrices(matrix m1, matrix m2) {
-    printMatrix(m1);
-    printMatrix(m2);
+    // printMatrix(m1);
+    // printMatrix(m2);
     matrix ans(m1.size(), vect (m2[0].size(), 0.0));
     for(int j = 0; j < ans[0].size(); j++) {
         for(int i = 0; i < ans.size(); i++) {
@@ -92,7 +93,7 @@ matrix multiplyMatrices(matrix m1, matrix m2) {
             }
         }
     }
-    printMatrix(ans);
+    // printMatrix(ans);
     return ans;
 }
 
@@ -199,17 +200,47 @@ vect matrixToVector(matrix m) {
     return ans;
 }
 
+struct Triangle {
+    double points[3][3];
+    int color[3];
+};
+
+void updateBuffers(double& zEntry, vector<int>& frameEntry, Triangle& triangle, double zp, double frontLimitZ) {
+    if(zp >= frontLimitZ && zp < zEntry) {
+        zEntry = zp;
+        for(int c = 0; c < 3; c++) {
+            frameEntry[c] = triangle.color[c];
+        }
+    }
+}
+
+pair<double, double> findIntersections(Triangle triangle, double ys, pair<int, int> endPoints) {
+    double x1 = triangle.points[endPoints.first][0];
+    double y1 = triangle.points[endPoints.first][1];
+    double z1 = triangle.points[endPoints.first][2];
+
+    double x2 = triangle.points[endPoints.second][0];
+    double y2 = triangle.points[endPoints.second][1];
+    double z2 = triangle.points[endPoints.second][2];
+
+    double x = x1 + ((x2 - x1) / (y2 - y1)) * (ys - y1);
+    double z = z1 + ((z2 - z1) / (y2 - y1)) * (ys - y1);
+
+    return {x, z};
+}
+
 int main() {
+    matrix points(3, vect(3));
     ifstream in;
     ofstream out;
+    out << setprecision(7) << fixed;
     string dirName;
 
-    /* input directory name */
+    /* Input directory name, gluLookAt and gluPerspective parameters */
+
     //cout << "Enter directory name:\n";
     //cin >> dirName;
     dirName = "t1";
-
-    /* input gluLookAt & gluPerspective parameters */
     in.open(dirName + "/scene.txt");
     double eyeX, eyeY, eyeZ, lookX, lookY, lookZ, upX, upY, upZ;
     double fovY, aspectRatio, near, far;
@@ -218,7 +249,8 @@ int main() {
     in >> upX >> upY >> upZ;
     in >> fovY >> aspectRatio >> near >> far;
 
-    /* stage 1: modeling transformation */
+    /* Stage 1: Modeling Transformation */
+
     out.open(dirName + "/stage1.txt");
     stack<matrix> transformationStack;
     transformationStack.push(createIdentityMatrix());
@@ -235,7 +267,7 @@ int main() {
                 point = matrixToVector(multiplyMatrices(transformationStack.top(), vectorToMatrix(point)));
                 //printVector(point);
                 scaleByW(point);
-                out << fixed << setprecision(7) << point[0] << " " << point[1] << " " << point[2] << endl;
+                out << point[0] << " " << point[1] << " " << point[2] << endl;
             }
             out << endl;
             triangleCount++;
@@ -271,7 +303,8 @@ int main() {
     in.close();
     out.close();
 
-    /* stage 2: view transformation */
+    /* Stage 2: View Transformation */
+
     in.open(dirName + "/stage1.txt");
     out.open(dirName + "/stage2.txt");
 
@@ -284,14 +317,15 @@ int main() {
             point[3] = 1.0;
             point = matrixToVector(multiplyMatrices(viewTransformation, vectorToMatrix(point)));
             scaleByW(point);
-            out << fixed << setprecision(7) << point[0] << " " << point[1] << " " << point[2] << endl;
+            out << point[0] << " " << point[1] << " " << point[2] << endl;
         }
         out << endl;
     }
     in.close();
     out.close();
 
-    /* stage 3: projection transformation */
+    /* Stage 3: Projection Transformation */
+
     in.open(dirName + "/stage2.txt");
     out.open(dirName + "/stage3.txt");
 
@@ -304,12 +338,125 @@ int main() {
             point[3] = 1.0;
             point = matrixToVector(multiplyMatrices(projectionTransformation, vectorToMatrix(point)));
             scaleByW(point);
-            out << fixed << setprecision(7) << point[0] << " " << point[1] << " " << point[2] << endl;
+            out << point[0] << " " << point[1] << " " << point[2] << endl;
         }
         out << endl;
     }
     in.close();
     out.close();
 
-    /* stage4: clipping & scan conversion using z-buffer algorithm */
+    /* Stage 4: Clipping & Scan Conversion Using Z-buffer Algorithm */
+
+    /* read data */
+
+    in.open(dirName + "/config.txt");
+    int screenWidth, screenHeight;
+    double leftLimitX, rightLimitX, bottomLimitY, topLimitY, frontLimitZ, rearLimitZ;
+    in >> screenWidth >> screenHeight;
+    in >> leftLimitX;
+    in >> bottomLimitY;
+    in >> frontLimitZ >> rearLimitZ;
+    in.close();
+
+    rightLimitX = -leftLimitX;
+    topLimitY = -bottomLimitY;
+
+    in.open(dirName + "/stage3.txt");
+    Triangle triangles[triangleCount];
+    for (int k = 0; k < triangleCount; k++) {
+        for (int i = 0; i < 3; i++) {
+            in >> triangles[k].points[i][0] >> triangles[k].points[i][1] >> triangles[k].points[i][2];
+        }
+        for (int i = 0; i < 3; i++) { // r, g, b
+            triangles[k].color[i] = rand() % 256;
+        }
+    }
+    in.close();
+
+    /* initialize z-buffer and frame buffer */
+
+    double dx, dy, leftX, rightX, topY, bottomY;
+    dx = (rightLimitX - leftLimitX) / screenWidth;
+    dy = (topLimitY - bottomLimitY) / screenHeight;
+    leftX = leftLimitX + (dx / 2.0);
+    rightX = rightLimitX - (dx / 2.0);
+    topY = topLimitY - (dy / 2.0);
+    bottomY = bottomLimitY + (dy / 2.0);
+
+    matrix zBuffer(screenHeight, vect (screenWidth, rearLimitZ));
+    colorMatrix frameBuffer(screenHeight, vector<vector<int>> (screenWidth, vector<int> (3, 0)));
+
+    /* applying procedure */
+
+    int topScanLine, bottomScanLine;
+    for(int k = 0; k < triangleCount; k++) {
+        /* finding top scan line & bottom scan line after necessary clipping */
+        double maxY = max(triangles[k].points[0][1], max(triangles[k].points[1][1], triangles[k].points[2][1]));
+        double minY = min(triangles[k].points[0][1], min(triangles[k].points[1][1], triangles[k].points[2][1]));
+        topScanLine = maxY > topY ? 0 : (int)round((topY - maxY) / dy);
+        bottomScanLine = minY < bottomY ? screenHeight - 1 : screenHeight - 1 - ((int)round((minY - bottomY) / dy));
+
+        int leftIntersectingColumn, rightIntersectingColumn;
+        for(int i = topScanLine; i <= bottomScanLine; i++) {
+            double ys = topY - i * dy;
+
+            pair<int,int> a = {0, 1};
+            pair<int,int> b = {0, 2};
+            // checking whether y values are equal. if equal, we will get 0 in the denominator
+            // while using the formula to calculate x and z
+            if (triangles[k].points[a.first][1] == triangles[k].points[a.second][1]) {
+                a = {1, 2};
+            } else if (triangles[k].points[b.first][1] == triangles[k].points[b.second][1]) {
+                b = {1, 2};
+            }
+
+            double xa, xb, za, zb;
+            pair<double, double> temp = findIntersections(triangles[k], ys, a);
+            xa = temp.first; za = temp.second;
+            temp = findIntersections(triangles[k], ys, b);
+            xb = temp.first; zb = temp.second;
+            if (xa > xb) {
+                swap(xa, xb);
+                swap(za, zb);
+            }
+
+            leftIntersectingColumn = xa > leftX ? round((xa - leftX) / dx) : 0;
+            rightIntersectingColumn = xb < rightX ? round((xb - leftX) / dx) : screenWidth - 1;
+
+
+            double xp = leftX + leftIntersectingColumn * dx;
+            double factor = (zb - za) / (xb - xa);
+            double zp = za + factor * (xp - xa);
+            double c = factor * dx;
+            updateBuffers(zBuffer[i][leftIntersectingColumn], frameBuffer[i][leftIntersectingColumn],
+                triangles[k], zp, frontLimitZ);
+            for(int j = leftIntersectingColumn + 1; j <= rightIntersectingColumn; j++) {
+                zp = zp + c;
+                updateBuffers(zBuffer[i][j], frameBuffer[i][j], triangles[k], zp, frontLimitZ);
+            }
+        }
+    }
+
+    /* saving output */
+
+    bitmap_image bitmapImage(screenWidth, screenHeight);
+    for(int i = 0; i < screenHeight; i++) {
+        for(int j = 0; j < screenWidth; j++) {
+            bitmapImage.set_pixel(j, i, frameBuffer[i][j][0], frameBuffer[i][j][1], frameBuffer[i][j][2]);
+        }
+    }
+    bitmapImage.save_image(dirName + "/out.bmp");
+
+    out.open(dirName + "/z-buffer.txt");
+    for(int i = 0; i < screenHeight; i++) {
+        for(int j = 0; j < screenWidth; j++) {
+            if(zBuffer[i][j] < rearLimitZ) {
+                out << zBuffer[i][j] << '\t';
+            }
+        }
+        out << "\n";
+    }
+    out.close();
+
+    return 0;
 }
