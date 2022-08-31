@@ -2,3 +2,6 @@ out/
 env/
 __pycache__/
 .idea/
+*.o
+*.exe
+.vscode/
