@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.*?>
+<?import javafx.scene.text.*?>
+<?import javafx.scene.control.*?>
+<?import java.lang.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+
+<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="400.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sample.Controller">
+   <children>
+      <HBox>
+         <children>
+            <Region prefHeight="40.0" prefWidth="0.0" HBox.hgrow="ALWAYS" />
+            <Label text="Word Frequency">
+               <font>
+                  <Font name="DAGGERSQUARE" size="32.0" />
+               </font>
+            </Label>
+            <Region layoutX="10.0" layoutY="10.0" HBox.hgrow="ALWAYS" />
+         </children>
+      </HBox>
+      <HBox>
+         <children>
+            <Button fx:id="btn1" mnemonicParsing="false" onAction="#openFileChooser" text="Choose file">
+               <HBox.margin>
+                  <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+               </HBox.margin>
+            </Button>
+            <Button layoutX="10.0" layoutY="10.0" mnemonicParsing="false" onAction="#showFreq" text="Show frequency">
+               <HBox.margin>
+                  <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+               </HBox.margin>
+            </Button>
+            <TextField fx:id="textField" promptText="File Name...">
+               <HBox.margin>
+                  <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+               </HBox.margin>
+            </TextField>
+         </children>
+      </HBox>
+      <TableView fx:id="table" prefHeight="336.0" prefWidth="600.0" VBox.vgrow="ALWAYS">
+        <columns>
+          <TableColumn fx:id="Col1" prefWidth="296.0" text="Word" />
+          <TableColumn fx:id="Col2" prefWidth="282.0" text="Frequency" />
+        </columns>
+         <VBox.margin>
+            <Insets bottom="10.0" left="10.0" right="10.0" />
+         </VBox.margin>
+      </TableView>
+   </children>
+</VBox>
