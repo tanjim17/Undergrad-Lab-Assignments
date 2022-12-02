@@ -3,8 +3,7 @@ import numpy as np
 MIN = 0
 MAX = 100
 
-print("Enter matrix dimension:")
-n = int(input())
+n = int(input("Enter matrix dimension: "))
 
 # Create a random integer invertible matrix
 A = np.random.randint(MIN, MAX, (n, n))
