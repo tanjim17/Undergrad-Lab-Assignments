@@ -41,10 +41,14 @@ def bagging_sampler(X, y):
     :param y:
     :return:
     """
-    # todo: implement
-    X_sample, y_sample = None, None
-    assert X_sample.shape == X.shape
-    assert y_sample.shape == y.shape
+    assert X.shape[0] == y.shape[0]
+    m = X.shape[0]
+
+    X_sample , y_sample = np.empty((0, X.shape[1])), np.empty((0,))
+
+    for i in range(m):
+        i = np.random.randint(0, m)
+        X_sample = np.append(X_sample, [X[i]], axis=0)
+        y_sample = np.append(y_sample, y[i])
+
     return X_sample, y_sample
-    # X_train, y_train, X_test, y_test = None, None, None, None
-    # return X_train, y_train, X_test, y_test
