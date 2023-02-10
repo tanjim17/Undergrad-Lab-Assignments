@@ -32,7 +32,7 @@ def main():
     y_predicted_labels = np.argmax(y_predicted, axis=1)
 
     # Save predictions in csv file
-    df = pd.DataFrame({'filename': filenames, 'digit': y_predicted_labels})
+    df = pd.DataFrame({'FileName': filenames, 'Digit': y_predicted_labels})
     df.to_csv('predictions.csv', index=False)
 
     # calculate performance scores
