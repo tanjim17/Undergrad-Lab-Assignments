@@ -3,21 +3,42 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import log_loss, accuracy_score, f1_score, confusion_matrix
 from tqdm import tqdm
-import math
 import cv2
+import pickle
+import sys, os, math
 
 IMG_SIZE = 32
 nCLASSES = 10
 
-batch_size = 32
-nEpochs = 10
-lr = 0.001
+def resize_images(dirname):
+    output_dirname = dirname + '_resized'
+    if not os.path.exists(output_dirname):
+        os.makedirs(output_dirname)
+
+    invalid_filenames = []
+    for filename in tqdm(os.listdir(dirname)):
+        try:
+            img = cv2.imread(os.path.join(dirname, filename))
+            resized_img = cv2.resize(img, (32, 32), cv2.INTER_AREA)
+            output_filename = os.path.join(output_dirname, filename)
+            cv2.imwrite(output_filename, resized_img)
+        except Exception as e:
+            invalid_filenames.append(filename)
+
+    with open('invalid_filenames.txt', 'w') as f:
+        f.write('count = ' + str(len(invalid_filenames)) + '\n')
+        for filename in invalid_filenames:
+            f.write(filename + '\n')
+
+    return output_dirname
 
 def load_images(filenames, dirname):
     print('\nLoading images...')
     images = np.zeros((len(filenames), 3, IMG_SIZE, IMG_SIZE))
     for i in tqdm(range(len(filenames))):
-        image = cv2.imread(dirname + '/' + filenames[i])
+        image = cv2.imread(os.path.join(dirname, filenames[i]))
+        if image is None:
+            exit(f'{filenames[i]} doesn\'t exist!')
         image = np.moveaxis(image, -1, 0)
         images[i] = image
     images = images / 255 # normalize
@@ -57,26 +78,26 @@ class ConvolutionLayer:
         self.weights = np.random.randn(self.out_channels, self.in_channels, self.kernel_size, self.kernel_size) * math.sqrt(2 / (self.in_channels * self.kernel_size * self.kernel_size))
         self.biases = np.zeros(self.out_channels)
 
-    def forward(self, x):
-        n, c, h, w = x.shape
+    def forward(self, input):
+        n, c, h, w = input.shape
         out_h = (h - self.kernel_size + 2 * self.padding) // self.stride + 1
         out_w = (w - self.kernel_size + 2 * self.padding) // self.stride + 1
 
-        windows = getWindows(x, (n, c, out_h, out_w), self.kernel_size, self.padding, self.stride)
+        windows = getWindows(input, (n, c, out_h, out_w), self.kernel_size, self.padding, self.stride)
 
-        out = np.einsum('bihwkl,oikl->bohw', windows, self.weights)
+        output = np.einsum('bihwkl,oikl->bohw', windows, self.weights)
         # add biases to kernels
-        out += self.biases[None, :, None, None]
+        output += self.biases[None, :, None, None]
 
-        self.cache = x, windows
-        return out
+        self.cache = input, windows
+        return output
 
-    def backward(self, grad_output):
-        x, windows = self.cache
+    def backward(self, grad_output, lr):
+        input, windows = self.cache
 
         padding = self.kernel_size - 1 if self.padding == 0 else self.padding
 
-        grad_output_windows = getWindows(grad_output, x.shape, self.kernel_size, padding=padding, stride=1, dilate=self.stride - 1)
+        grad_output_windows = getWindows(grad_output, input.shape, self.kernel_size, padding=padding, stride=1, dilate=self.stride - 1)
         rot_kern = np.rot90(self.weights, 2, axes=(2, 3))
 
         grad_biases = np.sum(grad_output, axis=(0, 2, 3))
@@ -110,7 +131,7 @@ class MaxPoolingLayer:
                         output[i, j, k, l] = np.max(input[i, j, x_start:x_end, y_start:y_end])
         return output
 
-    def backward(self, grad_output):
+    def backward(self, grad_output, lr):
         (batch_size, in_channels, height, width) = grad_output.shape
         grad_input = np.zeros_like(self.input)
         for i in range(batch_size):
@@ -132,7 +153,7 @@ class FlatteningLayer:
         self.input_shape = input.shape
         return input.reshape((input.shape[0], -1))
 
-    def backward(self, grad_output):
+    def backward(self, grad_output, lr):
         return grad_output.reshape(self.input_shape)
 
 class FullyConnectedLayer:
@@ -144,7 +165,7 @@ class FullyConnectedLayer:
         self.input = input
         return np.dot(input, self.weights) + self.biases
 
-    def backward(self, grad_output):
+    def backward(self, grad_output, lr):
         grad_input = np.dot(grad_output, self.weights.T)
         grad_weights = np.dot(self.input.T, grad_output)
         grad_biases = np.sum(grad_output, axis=0, keepdims=True)
@@ -159,23 +180,23 @@ class ReLULayer:
         self.input = input
         return np.maximum(0, input)
 
-    def backward(self, grad_output):
+    def backward(self, grad_output, lr):
         grad_input = grad_output.copy()
         grad_input[self.input < 0] = 0
         return grad_input
 
 class SoftmaxLayer:
-    def forward(self, u):
-        v = np.exp(u)
-        v = v / np.sum(v, axis=1, keepdims=True)
-        return v
+    def forward(self, input):
+        output = np.exp(input)
+        output = output / np.sum(output, axis=1, keepdims=True)
+        return output
 
-    def backward(self, del_v):
-        del_u = np.copy(del_v)
-        return del_u
+    def backward(self, grad_output, lr):
+        grad_input = np.copy(grad_output)
+        return grad_input
 
 class LeNet:
-    def __init__(self):
+    def __init__(self, lr):
         self.model_components = []
 
         self.model_components.append(ConvolutionLayer(in_channels=3, out_channels=6, kernel_size=5, stride=1, padding=0))
@@ -193,17 +214,19 @@ class LeNet:
         self.model_components.append(ReLULayer())
         self.model_components.append(FullyConnectedLayer(in_features=84, out_features=10))
         self.model_components.append(SoftmaxLayer())
+
+        self.lr = lr
     
     def train(self, u, y_true):
         for i in range(len(self.model_components)):
             u = self.model_components[i].forward(u)
             # print(i, u.shape)
-        
         del_v = u - y_true
         
         for i in range(len(self.model_components) - 1, -1, -1):
-            del_v = self.model_components[i].backward(del_v)
+            del_v = self.model_components[i].backward(del_v, self.lr)
             # print(i, del_v.shape)
+        return log_loss(y_true, u)
 
     
     def predict(self, u):
@@ -211,13 +234,37 @@ class LeNet:
             u = self.model_components[i].forward(u)
         return u
     
-    def save_model(self):
-        pass
-        # todo
+    def save_weights(self, epoch):
+        weights = []
+        biases = []
+        for i in range(len(self.model_components)):
+            if hasattr(self.model_components[i], 'weights'):
+                weights.append(self.model_components[i].weights)
+            if hasattr(self.model_components[i], 'biases'):
+                biases.append(self.model_components[i].biases)
+        params = {
+            'weights': weights,
+            'biases': biases
+        }
+        with open(f'params_lr_{self.lr}_epoch_{epoch + 1}.pkl', 'wb') as f:
+            pickle.dump(params, f)
+        
 
 def main():
+    # getting inputs
+    nEpochs = int(sys.argv[1])
+    batch_size = int(sys.argv[2])
+    lr = float(sys.argv[3])
+    csv_path = sys.argv[4]
+    dirname = sys.argv[5]
+    doResize = int(sys.argv[6])
+
+    # resize images
+    if doResize:
+        dirname = resize_images(dirname)
+
     # Load csv
-    train_val_df = pd.read_csv('temp1.csv')
+    train_val_df = pd.read_csv(csv_path)
     # print(train_val_data.head())
 
     # extract filenames and labels
@@ -228,25 +275,26 @@ def main():
     train_filenames, val_filenames, y_train, y_val = train_test_split(filenames, labels, test_size=0.2)
     
     #load train and validation data
-    x_train = load_images(train_filenames, dirname='train_val')
-    x_val = load_images(val_filenames, dirname='train_val')
+    x_train = load_images(train_filenames, dirname=dirname)
+    x_val = load_images(val_filenames, dirname=dirname)
     # print(x_train.shape, x_val.shape)
 
     # initialize model
-    model = LeNet()
-
-    nBatches = math.ceil(y_train.shape[0] / batch_size)
-    min_macro_f1_score = math.inf
+    model = LeNet(lr=lr)
 
     print('\nTraining...')
+    nBatches = math.ceil(y_train.shape[0] / batch_size)
     for epoch in tqdm(range(nEpochs)):
         # training
+        train_losses = [] 
         for batch in tqdm(range(nBatches)):
             curr_batch_size = y_train.shape[0] - batch * batch_size if (batch + 1) * batch_size > y_train.shape[0] else batch_size
             y_true = np.zeros((curr_batch_size, nCLASSES))
             for i in range(y_true.shape[0]):
                 y_true[i, y_train[batch * batch_size + i]] = 1  # generating one-hot encoding of y_train
-            model.train(x_train[batch * batch_size: batch * batch_size + curr_batch_size], y_true)
+            train_loss = model.train(x_train[batch * batch_size: batch * batch_size + curr_batch_size], y_true)
+            train_losses.append(train_loss)
+        train_loss = np.mean(train_losses)
         
         # validation
         y_true = np.zeros((y_val.shape[0], nCLASSES))
@@ -261,11 +309,17 @@ def main():
         accuracy = accuracy_score(y_val, y_predicted_labels)
         macro_f1_score = f1_score(y_val, y_predicted_labels, average='macro')
         
-        if macro_f1_score < min_macro_f1_score:
-            min_macro_f1_score = macro_f1_score
-        
-        print(f'Epoch: {epoch + 1}, Validation Loss: {val_loss}, Accuracy: {accuracy}, Macro F1 Score: {macro_f1_score}')
-        print(f'Confusion Matrix:\n{cm}')
+        print(f'Epoch: {epoch + 1}, Train Loss: {train_loss}, Validation Loss: {val_loss}, Accuracy: {accuracy}, Macro F1 Score: {macro_f1_score}')
+        print(f'Confusion Matrix:\n{cm}\n')
+
+        # write performance scores to file
+        with open(f'performance_scores_lr_{lr}.txt', 'a') as f:
+            f.write(f'Epoch: {epoch + 1}, Train Loss: {train_loss}, Validation Loss: {val_loss}, Accuracy: {accuracy}, Macro F1 Score: {macro_f1_score}\n')
+            f.write(f'Confusion Matrix:\n{cm}\n\n')
+
+        # save weights and biases
+        model.save_weights(epoch)
+
 
 if __name__ == '__main__':
     main()
