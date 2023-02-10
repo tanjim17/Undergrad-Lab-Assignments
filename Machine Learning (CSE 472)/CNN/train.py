@@ -16,6 +16,7 @@ def resize_images(dirname):
         os.makedirs(output_dirname)
 
     invalid_filenames = []
+    print('\nResizing images...')
     for filename in tqdm(os.listdir(dirname)):
         try:
             img = cv2.imread(os.path.join(dirname, filename))
@@ -67,7 +68,11 @@ def getWindows(input, output_size, kernel_size, padding=0, stride=1, dilate=0):
         (batch_str, channel_str, stride * kern_h_str, stride * kern_w_str, kern_h_str, kern_w_str)
     )
 
-class ConvolutionLayer:
+class Layer():
+    weights = None
+    biases = None
+
+class ConvolutionLayer(Layer):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=0):
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -109,7 +114,7 @@ class ConvolutionLayer:
 
         return grad_input
 
-class MaxPoolingLayer:
+class MaxPoolingLayer(Layer):
     def __init__(self, pool_size, stride=2):
         self.pool_size = pool_size
         self.stride = stride
@@ -148,7 +153,7 @@ class MaxPoolingLayer:
                         grad_input[i, j, x_start:x_end, y_start:y_end][max_index] = grad_output[i, j, k, l]
         return grad_input
 
-class FlatteningLayer:
+class FlatteningLayer(Layer):
     def forward(self, input):
         self.input_shape = input.shape
         return input.reshape((input.shape[0], -1))
@@ -156,7 +161,7 @@ class FlatteningLayer:
     def backward(self, grad_output, lr):
         return grad_output.reshape(self.input_shape)
 
-class FullyConnectedLayer:
+class FullyConnectedLayer(Layer):
     def __init__(self, in_features, out_features):
         self.weights = np.random.randn(in_features, out_features) * math.sqrt(2 / in_features)
         self.biases = np.zeros((1, out_features))
@@ -175,7 +180,7 @@ class FullyConnectedLayer:
         
         return grad_input
 
-class ReLULayer:
+class ReLULayer(Layer):
     def forward(self, input):
         self.input = input
         return np.maximum(0, input)
@@ -185,7 +190,7 @@ class ReLULayer:
         grad_input[self.input < 0] = 0
         return grad_input
 
-class SoftmaxLayer:
+class SoftmaxLayer(Layer):
     def forward(self, input):
         output = np.exp(input)
         output = output / np.sum(output, axis=1, keepdims=True)
@@ -238,17 +243,24 @@ class LeNet:
         weights = []
         biases = []
         for i in range(len(self.model_components)):
-            if hasattr(self.model_components[i], 'weights'):
-                weights.append(self.model_components[i].weights)
-            if hasattr(self.model_components[i], 'biases'):
-                biases.append(self.model_components[i].biases)
+            weights.append(self.model_components[i].weights)
+            biases.append(self.model_components[i].biases)
         params = {
             'weights': weights,
             'biases': biases
         }
         with open(f'params_lr_{self.lr}_epoch_{epoch + 1}.pkl', 'wb') as f:
             pickle.dump(params, f)
-        
+
+    def set_weights(self, filepath):
+        with open(filepath, 'rb') as f:
+            params = pickle.load(f)
+        weights = params['weights']
+        biases = params['biases']
+
+        for i in range(len(self.model_components)):
+            self.model_components[i].weights = weights[i]
+            self.model_components[i].biases = biases[i]     
 
 def main():
     # getting inputs
