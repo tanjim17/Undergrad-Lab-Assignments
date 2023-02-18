@@ -20,7 +20,7 @@ def resize_images(dirname):
     for filename in tqdm(os.listdir(dirname)):
         try:
             img = cv2.imread(os.path.join(dirname, filename))
-            resized_img = cv2.resize(img, (32, 32), cv2.INTER_AREA)
+            resized_img = cv2.resize(img, (IMG_SIZE, IMG_SIZE), cv2.INTER_AREA)
             output_filename = os.path.join(output_dirname, filename)
             cv2.imwrite(output_filename, resized_img)
         except Exception as e:
