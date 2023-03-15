@@ -2,6 +2,8 @@
 
 ## Topics
 
+*Several courses and topics are not mentioned here. Only the topics for which we had assignments in our sessional courses are listed.*
+
 ### 1st year
 
 1. **Object Oriented Programming (CSE 108)**
@@ -77,11 +79,10 @@
    * A* Search
    * Adversarial Search
    * Hidden Markov Model
-   * Intermediate Code Generation
 7. **Computer Networks (CSE 322)**
    * Socket Programming
    * Packet Tracer
-   * ns3
+   * ns-3
 
 ### 4th year
 
